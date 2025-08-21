@@ -49,7 +49,12 @@ def cli():
     default="", 
     help="Comma-separated list of folders to include (e.g., docs,examples,tests)"
 )
-def clone(repo_url: str, include_folders: str):
+@click.option(
+    "--branch", "-b",
+    default="main",
+    help="Git branch to clone (default: main)"
+)
+def clone(repo_url: str, include_folders: str, branch: str):
     """Clone a repository and set up a new benchmark run."""
     show_logo()
     try:
@@ -59,7 +64,8 @@ def clone(repo_url: str, include_folders: str):
             
             context = repo_manager.clone_repository(
                 repo_url=repo_url,
-                include_folders=parsed_folders
+                include_folders=parsed_folders,
+                branch=branch
             )
         
         console.print(f"[bold green]✓[/bold green] Repository cloned successfully!")

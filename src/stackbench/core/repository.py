@@ -24,7 +24,8 @@ class RepositoryManager:
         repo_url: str, 
         agent_type: Optional[str] = None,
         include_folders: Optional[List[str]] = None,
-        num_use_cases: Optional[int] = None
+        num_use_cases: Optional[int] = None,
+        branch: str = "main"
     ) -> RunContext:
         """Clone repository and set up run directory structure.
         
@@ -33,6 +34,7 @@ class RepositoryManager:
             agent_type: Agent type to use for this run
             include_folders: Optional list of folders to focus on for extraction
             num_use_cases: Number of use cases to generate
+            branch: Git branch to clone (default: main)
             
         Returns:
             RunContext with cloned repository and directory structure
@@ -48,8 +50,8 @@ class RepositoryManager:
         context.create_directories()
         
         try:
-            # Clone repository
-            git.Repo.clone_from(repo_url, context.repo_dir)
+            # Clone repository with specific branch
+            git.Repo.clone_from(repo_url, context.repo_dir, branch=branch)
             
             # Mark clone as completed and save
             context.mark_clone_completed()
