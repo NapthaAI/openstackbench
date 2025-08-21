@@ -10,6 +10,23 @@ from .core.repository import RepositoryManager
 
 console = Console()
 
+STACKBENCH_LOGO = """
+[bold cyan]
+ ███████╗████████╗ █████╗  ██████╗██╗  ██╗██████╗ ███████╗███╗   ██╗ ██████╗██╗  ██╗
+ ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝██╔══██╗██╔════╝████╗  ██║██╔════╝██║  ██║
+ ███████╗   ██║   ███████║██║     █████╔╝ ██████╔╝█████╗  ██╔██╗ ██║██║     ███████║
+ ╚════██║   ██║   ██╔══██║██║     ██╔═██╗ ██╔══██╗██╔══╝  ██║╚██╗██║██║     ██╔══██║
+ ███████║   ██║   ██║  ██║╚██████╗██║  ██╗██████╔╝███████╗██║ ╚████║╚██████╗██║  ██║
+ ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═══╝ ╚═════╝╚═╝  ╚═╝
+[/bold cyan]
+[dim]Benchmark coding agents on library-specific tasks[/dim]
+"""
+
+
+def show_logo():
+    """Show the StackBench logo."""
+    console.print(STACKBENCH_LOGO)
+
 
 def parse_include_folders(include_folders_str: str) -> List[str]:
     """Parse comma-separated include folders string."""
@@ -28,12 +45,13 @@ def cli():
 @cli.command()
 @click.argument("repo_url")
 @click.option(
-    "--include-folders", 
+    "--include-folders", "-i",
     default="", 
     help="Comma-separated list of folders to include (e.g., docs,examples,tests)"
 )
 def clone(repo_url: str, include_folders: str):
     """Clone a repository and set up a new benchmark run."""
+    show_logo()
     try:
         with console.status("[bold green]Cloning repository..."):
             repo_manager = RepositoryManager()
