@@ -163,12 +163,12 @@ StackBench clones your target repository and creates an isolated benchmark envir
 ### 2. Agent Types
 
 **IDE Agents** (Manual execution)
-- Cursor, VSCode extensions
+- Cursor
 - Human interaction through IDE
 - Pipeline: `clone → extract → manual execution → analyze`
 
 **CLI Agents** (Automated execution)  
-- OpenAI API, local LLMs
+- claude-code
 - Fully automated execution
 - Pipeline: `clone → extract → execute → analyze`
 
@@ -270,14 +270,8 @@ We welcome contributions! Please see our development guidelines in [CLAUDE.md](C
 - Architecture decisions and patterns
 - Code style and conventions
 
-## License
-
-[Add your license here]
-
 ## Status
 
 🚧 **Early Development** - Core repository management and CLI interface complete. Use case extraction and agent execution in development.
 
 ---
-
-*Built with ❤️ for the coding agent community*
