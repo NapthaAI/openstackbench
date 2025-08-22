@@ -48,6 +48,77 @@ stackbench clone https://github.com/user/awesome-lib -i docs,examples
 stackbench clone https://github.com/user/awesome-lib -b develop -i docs,tutorials
 ```
 
+## CLI Commands
+
+### Repository Management
+
+**`stackbench clone <repo-url>`**
+Clone a repository and set up a new benchmark run.
+
+```bash
+# Basic clone
+stackbench clone https://github.com/user/awesome-lib
+
+# Include specific folders only
+stackbench clone https://github.com/user/awesome-lib -i docs,examples
+
+# Clone specific branch
+stackbench clone https://github.com/user/awesome-lib -b develop
+```
+
+**`stackbench list`**
+List all benchmark runs with their status.
+
+```bash
+stackbench list
+```
+
+Shows a table with:
+- **Run ID**: Full UUID for use with other commands
+- **Repository**: Repository name
+- **Phase**: Current phase (created → cloned → extracted → executed → analyzed)
+- **Agent**: Configured agent type (cursor, openai, etc.)
+- **Created**: Creation timestamp
+- **Use Cases**: Number of extracted use cases (— if not extracted yet)
+- **Status**: Success rate and error indicators
+
+### Use Case Extraction
+
+**`stackbench extract <run-id>`**
+Extract use cases from a cloned repository's documentation.
+
+```bash
+# Extract use cases from a run
+stackbench extract 4a72004a-592b-49b7-9920-08cf54485f85
+```
+
+This command:
+- Validates the run is in "cloned" phase
+- Uses DSPy to analyze markdown documentation
+- Generates library-specific use cases with:
+  - Functional requirements
+  - User stories  
+  - System design guidance
+  - Target audience and complexity level
+- Updates run phase to "extracted"
+- Shows next steps based on agent type
+
+### Workflow Examples
+
+**Manual IDE Workflow (Cursor)**:
+```bash
+stackbench clone https://github.com/user/lib -i docs
+stackbench list                    # Get run ID
+stackbench extract <run-id>        # Generate use cases
+# Manual execution in Cursor IDE
+stackbench analyze <run-id>        # Process results
+```
+
+**Automated CLI Workflow** (Future):
+```bash
+stackbench run https://github.com/user/lib --agent openai
+```
+
 ## How It Works
 
 ### 1. Repository Setup
@@ -72,18 +143,14 @@ StackBench clones your target repository and creates an isolated benchmark envir
 - Fully automated execution
 - Pipeline: `clone → extract → execute → analyze`
 
-### 3. Workflow
+### 3. Execution Pipeline
 
-```bash
-# For IDE agents (like Cursor)
-stackbench clone <repo-url> --agent cursor
-stackbench extract <run-id>        # Generates use case prompts
-# Manual execution in Cursor
-stackbench analyze <run-id>        # Process results
+Each run progresses through these phases:
+- **created** → **cloned** → **extracted** → **executed** → **analyzed**
 
-# For CLI agents  
-stackbench run <repo-url> --agent openai  # Full automation
-```
+The pipeline adapts based on agent type:
+- **IDE agents**: Manual execution with generated prompts
+- **CLI agents**: Fully automated execution
 
 ## Configuration
 
