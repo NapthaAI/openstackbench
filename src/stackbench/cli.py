@@ -2,6 +2,7 @@
 
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
 import click
@@ -11,6 +12,7 @@ from rich.table import Table
 from .core.repository import RepositoryManager
 from .core.run_context import RunContext
 from .extractors.extractor import extract_use_cases
+from .agents.cursor_ide import CursorIDEAgent
 
 console = Console()
 
@@ -287,6 +289,68 @@ def extract(run_id: str):
         sys.exit(1)
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Failed to extract use cases: {e}")
+        sys.exit(1)
+
+
+@cli.command("print-prompt")
+@click.argument("run_id")
+@click.option("--use-case", "-u", type=int, required=True, help="Use case number (1-based)")
+@click.option("--agent", "-a", default=None, help="Agent type override (default: use run config)")
+def print_prompt(run_id: str, use_case: int, agent: Optional[str]):
+    """Print formatted prompt for manual execution of a specific use case."""
+    try:
+        # Load run context
+        context = RunContext.load(run_id)
+        
+        # Validate run phase
+        if context.status.phase not in ["extracted", "executed", "analyzed"]:
+            console.print(f"[bold red]✗[/bold red] Run must be extracted first, currently: {context.status.phase}")
+            if context.status.phase == "cloned":
+                console.print("[dim]Use 'stackbench extract <run-id>' first to generate use cases.[/dim]")
+            sys.exit(1)
+        
+        # Determine agent to use
+        agent_name = agent or context.config.agent_type
+        
+        # For now, only support cursor (can be extended later)
+        if agent_name.lower() != "cursor":
+            console.print(f"[bold red]✗[/bold red] Agent '{agent_name}' not supported yet. Currently supported: cursor")
+            sys.exit(1)
+        
+        # Create agent and format prompt
+        cursor_agent = CursorIDEAgent()
+        
+        try:
+            prompt = cursor_agent.format_prompt(run_id, use_case)
+        except ValueError as e:
+            console.print(f"[bold red]✗[/bold red] {e}")
+            sys.exit(1)
+        
+        # Display prompt
+        console.print(f"[bold blue]Use Case {use_case} Prompt for {agent_name.title()}:[/bold blue]")
+        console.print()
+        console.print(prompt)
+        
+        # Show helpful next steps
+        target_dir = cursor_agent.get_target_directory(run_id, use_case)
+        try:
+            relative_target_dir = target_dir.relative_to(Path.cwd())
+        except ValueError:
+            # If target_dir is not under current working directory, use absolute path
+            relative_target_dir = target_dir
+        
+        console.print(f"\n[bold]Next Steps:[/bold]")
+        console.print(f"[yellow]1.[/yellow] Copy the prompt above")
+        console.print(f"[yellow]2.[/yellow] Open Cursor IDE in the repository directory")
+        console.print(f"[yellow]3.[/yellow] Create your solution in: [cyan]{relative_target_dir}/solution.py[/cyan]")
+        console.print(f"[yellow]4.[/yellow] Use 'stackbench analyze {run_id}' when all use cases are complete")
+        
+    except FileNotFoundError:
+        console.print(f"[bold red]✗[/bold red] Run ID '{run_id}' not found.")
+        console.print("[dim]Use 'stackbench list' to see available runs.[/dim]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[bold red]✗[/bold red] Failed to generate prompt: {e}")
         sys.exit(1)
 
 

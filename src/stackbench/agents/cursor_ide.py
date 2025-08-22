@@ -1,0 +1,92 @@
+"""Cursor IDE agent implementation."""
+
+from pathlib import Path
+
+from .base import Agent
+
+
+class CursorIDEAgent(Agent):
+    """Agent for Cursor IDE manual execution."""
+    
+    @property
+    def agent_type(self) -> str:
+        return "ide"
+    
+    @property
+    def name(self) -> str:
+        return "cursor"
+    
+    def format_prompt(self, run_id: str, use_case_number: int) -> str:
+        """Format use case for Cursor IDE execution."""
+        use_case = self.load_use_case(run_id, use_case_number)
+        context = self.get_run_context(run_id)
+        target_dir = self.get_target_directory(run_id, use_case_number)
+        
+        # Get relative paths for cleaner display
+        try:
+            relative_target_dir = target_dir.relative_to(Path.cwd())
+        except ValueError:
+            relative_target_dir = target_dir
+            
+        try:
+            relative_repo_dir = context.repo_dir.relative_to(Path.cwd())
+        except ValueError:
+            relative_repo_dir = context.repo_dir
+        
+        prompt = f"""# {use_case.name}
+
+## Use Case Details
+
+**Elevator Pitch:** {use_case.elevator_pitch}
+
+**Target Audience:** {use_case.target_audience}
+**Complexity Level:** {use_case.complexity_level}
+**Real-world Scenario:** {use_case.real_world_scenario}
+
+### Functional Requirements
+"""
+        for i, req in enumerate(use_case.functional_requirements, 1):
+            prompt += f"{i}. {req}\n"
+        
+        prompt += f"""
+### User Stories
+"""
+        for i, story in enumerate(use_case.user_stories, 1):
+            prompt += f"{i}. {story}\n"
+        
+        prompt += f"""
+### System Design
+{use_case.system_design}
+
+### Architecture Pattern
+{use_case.architecture_pattern}
+
+## Instructions
+
+Please implement the use case described above.
+
+**Documentation Location:** The repository documentation is located at `{relative_repo_dir}`.
+
+**Use Documentation for Help:** Please review and use the documentation in the repository to help you understand the library's APIs, patterns, and best practices.
+
+**File Creation:** Create a single entry file called `{use_case.target_file}` (solution.py or solution.js depending on the library language).
+
+**Target Directory:** Create the directory `{relative_target_dir}` if it doesn't exist. All files that you decide to create should be placed in this directory.
+
+### Implementation Requirements:
+- Meet all functional requirements listed above
+- Follow the specified architecture pattern  
+- Be appropriate for the target audience complexity level
+- Include proper error handling and documentation
+- Use the repository's existing patterns and conventions
+- Leverage the library's APIs and utilities where appropriate
+- Include comments explaining your approach
+- Consider edge cases and error scenarios
+
+---
+**Repository Path:** `{relative_repo_dir}`
+**Target Directory:** `{relative_target_dir}`
+**Main File:** `{relative_target_dir}/{use_case.target_file}`
+"""
+        
+        return prompt
