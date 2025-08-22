@@ -1,6 +1,16 @@
-# OpenStackBench
+# StackBench
 
-OpenStackBench is an open source local deployment tool for benchmarking coding agents (especially Cursor) on library-specific tasks.
+StackBench is an open source local deployment tool for benchmarking coding agents (especially Cursor) on library-specific tasks.
+
+## Purpose
+
+To enable library maintainers and enterprise teams to benchmark how well coding agents (e.g. Cursor) perform on library-specific tasks through local deployment and open source community collaboration.
+
+**Library-specific tasks** include:
+- Using library APIs correctly (proper imports, method calls, configuration)
+- Following library-specific patterns and conventions
+- Handling library-specific error cases and edge conditions
+- Implementing common use cases as documented in library examples
 
 ## Setup
 
@@ -54,22 +64,23 @@ source .venv/bin/activate
 ```
 stackbench/
 ├── src/stackbench/
-│   ├── cli.py                    # Rich-based CLI
-│   ├── config.py                 # Pydantic configuration
+│   ├── cli.py                    # Rich-based CLI entry point
+│   ├── config.py                 # Pydantic configuration models
 │   ├── core/
-│   │   ├── run_context.py        # RunContext, RunConfig, RunStatus
-│   │   ├── repository.py         # RepositoryManager for git operations
+│   │   ├── run_context.py        # Run state management
+│   │   └── repository.py         # Git operations and repo management
 │   ├── agents/
-│   │   ├── base.py              # Abstract Agent interface
+│   │   ├── base.py              # Abstract agent interface
+│   │   ├── openai_agent.py      # OpenAI API integration
+│   │   └── cursor_agent.py      # Cursor IDE workflows
 │   ├── extractors/
-│   │   └── dspy_extractor.py    # DSPy-powered extraction
-│   ├── storage/
-│   │   ├── results.py           # Result persistence
-│   │   └── cache.py             # Caching layer
-│   └── utils/
-│       ├── git.py               # Git operations
-│       ├── file_utils.py        # File operations
-│       └── rich_utils.py        # Rich console utilities
+│   │   ├── models.py            # Pydantic models for extraction
+│   │   ├── signatures.py        # DSPy signatures
+│   │   ├── modules.py           # DSPy modules
+│   │   ├── extractor.py         # Main extraction logic
+│   │   └── utils.py             # Token counting utilities
+│   └── analyzers/
+│       └── dspy_analyzer.py     # DSPy-powered performance analysis
 ├── tests/                       # Test files
 ├── data/                        # Benchmark run data (git ignored)
 ├── examples/                    # Example benchmark configs
@@ -131,16 +142,16 @@ uv run pytest -k "test_name" -v        # Run specific test
 Each benchmark run creates a unique folder in `./data/<uuid>/`:
 ```
 ./data/<uuid>/
-├── repo/                  # Cloned repository
+├── repo/                    # Cloned repository 
 ├── data/
-│   ├── use_cases.json     # Generated use cases from extract phase
-│   ├── results.json       # Execution results
-│   ├── analysis.json      # Analysis output
-│   └── use_case_1/        # Individual use case execution
-│       ├── solution.py    # Agent-generated solution
-│       ├── output.txt     # Execution output
-│       └── errors.txt     # Any errors
-└── run_context.json       # Complete run state and configuration
+│   ├── use_cases.json      # Generated use cases
+│   ├── results.json        # Structured execution results
+│   └── use_case_1/         # Individual execution
+│       ├── solution.py     # Generated solution
+│       ├── output.txt      # Execution output
+│       └── errors.txt      # Error logs
+├── run_context.json        # Complete run state
+└── results.md              # Generated analysis report
 ```
 
 ### Run Context & Configuration
@@ -173,19 +184,21 @@ stackbench run <repo-url> --agent <cli-agent>  # Complete automation
 
 **Manual Pipeline (IDE agents):**
 ```bash
-stackbench init <repo-url> --agent cursor     # Clone + extract + print prompts
+stackbench init <repo-url> --agent cursor     # Clone + extract + setup
 # Manual execution in IDE (copy prompts, create files in use_case_X/ dirs)
 stackbench analyze <run-id>                   # Process results
 ```
 
 **Individual Steps:**
 ```bash
-stackbench clone <repo-url>                   # Clone repository (returns run-id)
-stackbench extract <run-id>                   # Generate use cases
-stackbench execute <run-id> --agent <agent>   # Execute (if CLI agent)
-stackbench analyze <run-id>                   # Analyze results
-stackbench status <run-id>                    # Check run status
-stackbench list                               # List all runs
+stackbench clone <repo-url>                       # Clone repository (returns run-id)
+stackbench extract <run-id>                       # Generate use cases
+stackbench print-prompt <run-id> --use-case <n>   # Print specific use case prompt for manual execution
+stackbench execute <run-id> --agent <agent>       # Execute with agent
+stackbench analyze <run-id>                       # Generate analysis
+stackbench status <run-id>                        # Check run status
+stackbench list                                   # List all runs
+stackbench clean                                  # Clean up old runs
 ```
 
 ### Run State Management
@@ -197,3 +210,68 @@ Each phase completion is tracked with:
 - Execution counts and success rates  
 - Error logs with timestamps
 - Automatic state persistence
+
+## Analysis & Results Output
+
+### Report Generation
+StackBench generates dual output formats for each analysis:
+- **results.json**: Structured data for programmatic access and integration
+- **results.md**: Human-readable analysis report focusing on specific failure patterns and root causes
+
+### Core Analysis Components
+
+1. **Pass/Fail Flag**: Did coding agents successfully complete library-specific tasks?
+2. **Success Rate**: Percentage of use cases completed successfully.
+3. **Common Failures**: Top error patterns and failure reasons.
+
+### Report Structure Template
+
+```markdown
+# [Library Name] Analysis Report
+
+**Pass/Fail Status:** [PASS/FAIL]
+**Success Rate:** [X/Y tasks successful (Z%)]
+
+## Executive Summary
+- Overall pass/fail determination
+- Success rate with specific numbers
+- Primary failure patterns identified
+
+## Common Failures Analysis
+### [Specific Error Pattern] (e.g., "API Deprecation Issues")
+- Detailed breakdown of failure cases
+- Root cause analysis with code examples
+- Pattern recognition across multiple use cases
+
+## Framework-Specific Insights
+- API evolution and breaking changes
+- Documentation quality issues
+- Systematic problems affecting coding agents
+```
+
+## IDE Agent Manual Execution
+
+### Manual Execution Workflow
+
+**1. Environment Setup (Automated)**
+```bash
+stackbench clone <repo-url>                         # Clone repository and get run-id
+stackbench extract <run-id>                         # Generate use cases
+stackbench print-prompt <run-id> --use-case 1       # Print first use case prompt
+```
+
+**2. Manual IDE Interaction (Human-Driven)**
+- Open prepared repository in IDE (Cursor, VS Code, etc.)
+- For each use case:
+  - Run `stackbench print-prompt <run-id> --use-case <n>` to get the specific prompt
+  - Start new chat session with coding agent
+  - Copy/paste the printed use case prompt
+  - Allow agent to explore repository and propose solutions
+  - Accept/modify suggested changes based on technical merit
+  - Save solution in `./data/<uuid>/data/use_case_<n>/solution.py`
+  - Repeat for all use cases
+
+**3. Results Collection (Automated)**
+```bash
+stackbench analyze <run-id>  # Process completed manual execution results
+```
