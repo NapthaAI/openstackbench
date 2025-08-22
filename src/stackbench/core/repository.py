@@ -53,6 +53,9 @@ class RepositoryManager:
             # Clone repository with specific branch
             git.Repo.clone_from(repo_url, context.repo_dir, branch=branch)
             
+            # Clean up non-documentation files to save space and focus on relevant content
+            self.cleanup_non_documentation_files(context.repo_dir)
+            
             # Mark clone as completed and save
             context.mark_clone_completed()
             
@@ -63,6 +66,47 @@ class RepositoryManager:
             if context.run_dir.exists():
                 shutil.rmtree(context.run_dir)
             raise RuntimeError(f"Failed to clone repository {repo_url}: {e}")
+    
+    def cleanup_non_documentation_files(self, repo_dir: Path) -> None:
+        """Remove all files except documentation and configuration files.
+        
+        Keeps only: .md, .mdx, .toml, .json, .yaml, .yml files
+        Preserves: .git directory and its contents
+        Removes: All other files and empty directories
+        
+        Args:
+            repo_dir: Path to the cloned repository directory
+        """
+        allowed_extensions = {'.md', '.mdx', '.toml', '.json', '.yaml', '.yml'}
+        preserved_dirs = {'.git'}
+        
+        # Walk the directory tree from bottom up to handle directory removal
+        for root, dirs, files in os.walk(repo_dir, topdown=False):
+            root_path = Path(root)
+            
+            # Skip .git directory and its contents
+            if any(preserved_dir in root_path.parts for preserved_dir in preserved_dirs):
+                continue
+            
+            # Remove files that don't match allowed extensions
+            for file in files:
+                file_path = root_path / file
+                if file_path.suffix.lower() not in allowed_extensions:
+                    try:
+                        file_path.unlink()
+                    except OSError:
+                        # Skip files that can't be removed (permissions, etc.)
+                        pass
+            
+            # Remove empty directories (but not the root repo directory)
+            if root_path != repo_dir:
+                try:
+                    # Only remove if directory is empty
+                    if not any(root_path.iterdir()):
+                        root_path.rmdir()
+                except OSError:
+                    # Directory not empty or can't be removed
+                    pass
     
     def find_markdown_files(self, context: RunContext, include_folders: Optional[List[str]] = None) -> List[Path]:
         """Find markdown files in the cloned repository.

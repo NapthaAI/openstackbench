@@ -207,20 +207,25 @@ class TestRepositoryManager:
     
     def test_clone_repository(self, repo_manager, mock_git_repo, temp_data_dir):
         """Test repository cloning."""
-        # Mock successful clone
+        # Mock successful clone and cleanup
         mock_git_repo.return_value = Mock()
         
-        context = repo_manager.clone_repository(
-            repo_url="https://github.com/user/test-repo",
-            agent_type="cursor",
-            include_folders=["docs"],
-            num_use_cases=5
-        )
+        with patch.object(repo_manager, 'cleanup_non_documentation_files') as mock_cleanup:
+            context = repo_manager.clone_repository(
+                repo_url="https://github.com/user/test-repo",
+                agent_type="cursor",
+                include_folders=["docs"],
+                num_use_cases=5
+            )
+            
+            # Check cleanup was called
+            mock_cleanup.assert_called_once_with(context.repo_dir)
         
         # Check git clone was called
         mock_git_repo.assert_called_once_with(
             "https://github.com/user/test-repo", 
-            context.repo_dir
+            context.repo_dir,
+            branch="main"
         )
         
         # Check context properties
@@ -335,6 +340,82 @@ class TestRepositoryManager:
         """Test cleaning up nonexistent run (should not raise error)."""
         # Should not raise an error
         repo_manager.cleanup_run("nonexistent")
+    
+    def test_cleanup_non_documentation_files(self, repo_manager, temp_data_dir):
+        """Test cleanup of non-documentation files."""
+        # Create a mock repository structure with various file types
+        repo_dir = temp_data_dir / "test_repo"
+        repo_dir.mkdir()
+        
+        # Create .git directory (should be preserved)
+        git_dir = repo_dir / ".git"
+        git_dir.mkdir()
+        (git_dir / "config").touch()
+        
+        # Create documentation files (should be preserved)
+        (repo_dir / "README.md").touch()
+        (repo_dir / "guide.mdx").touch()
+        (repo_dir / "config.toml").touch()
+        (repo_dir / "package.json").touch()
+        (repo_dir / "settings.yaml").touch()
+        (repo_dir / "metadata.yml").touch()
+        
+        # Create docs subdirectory with mixed files
+        docs_dir = repo_dir / "docs"
+        docs_dir.mkdir()
+        (docs_dir / "api.md").touch()
+        (docs_dir / "tutorial.mdx").touch()
+        (docs_dir / "image.png").touch()  # Should be removed
+        (docs_dir / "config.json").touch()  # Should be preserved
+        
+        # Create src directory with code files (should be removed)
+        src_dir = repo_dir / "src"
+        src_dir.mkdir()
+        (src_dir / "main.py").touch()  # Should be removed
+        (src_dir / "utils.js").touch()  # Should be removed
+        (src_dir / "data.json").touch()  # Should be preserved
+        
+        # Create empty directory (should be removed after cleanup)
+        empty_dir = repo_dir / "empty"
+        empty_dir.mkdir()
+        
+        # Count files before cleanup
+        all_files_before = list(repo_dir.rglob("*"))
+        files_before = [f for f in all_files_before if f.is_file()]
+        
+        # Run cleanup
+        repo_manager.cleanup_non_documentation_files(repo_dir)
+        
+        # Count files after cleanup
+        all_files_after = list(repo_dir.rglob("*"))
+        files_after = [f for f in all_files_after if f.is_file()]
+        
+        # Check that documentation files are preserved
+        assert (repo_dir / "README.md").exists()
+        assert (repo_dir / "guide.mdx").exists()
+        assert (repo_dir / "config.toml").exists()
+        assert (repo_dir / "package.json").exists()
+        assert (repo_dir / "settings.yaml").exists()
+        assert (repo_dir / "metadata.yml").exists()
+        assert (docs_dir / "api.md").exists()
+        assert (docs_dir / "tutorial.mdx").exists()
+        assert (docs_dir / "config.json").exists()
+        assert (src_dir / "data.json").exists()
+        
+        # Check that .git directory is preserved
+        assert git_dir.exists()
+        assert (git_dir / "config").exists()
+        
+        # Check that non-documentation files are removed
+        assert not (docs_dir / "image.png").exists()
+        assert not (src_dir / "main.py").exists()
+        assert not (src_dir / "utils.js").exists()
+        
+        # Check that empty directory was removed
+        assert not empty_dir.exists()
+        
+        # Verify we have fewer files after cleanup
+        assert len(files_after) < len(files_before)
 
 
 if __name__ == "__main__":
