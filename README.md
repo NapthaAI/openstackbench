@@ -33,6 +33,10 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/your-org/stackbench
 cd stackbench
 uv sync
+
+# Configure environment variables
+cp .env.sample .env
+# Edit .env and add your OpenAI API key
 ```
 
 ### Basic Usage
@@ -179,15 +183,36 @@ The pipeline adapts based on agent type:
 
 ## Configuration
 
-StackBench uses Pydantic for configuration management with environment variable support:
+StackBench uses Pydantic for configuration management with environment variable support.
 
-```bash
-# .env file
-STACKBENCH_DATA_DIR=./custom-data
-STACKBENCH_NUM_USE_CASES=15
-STACKBENCH_DSPY_MODEL=gpt-4o-mini
-STACKBENCH_LOG_LEVEL=DEBUG
-```
+### Environment Setup
+
+1. **Copy the sample environment file**:
+   ```bash
+   cp .env.sample .env
+   ```
+
+2. **Add your OpenAI API key** (required for use case extraction):
+   ```bash
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
+
+3. **Customize other settings** as needed:
+   ```bash
+   # Core settings
+   DATA_DIR=./custom-data
+   NUM_USE_CASES=15
+   DEFAULT_AGENT=cursor
+   
+   # DSPy settings
+   DSPY_MODEL=gpt-4o-mini
+   DSPY_MAX_TOKENS=10000
+   
+   # Logging
+   LOG_LEVEL=DEBUG
+   ```
+
+See `.env.sample` for all available configuration options with detailed descriptions.
 
 ## Development
 

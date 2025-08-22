@@ -25,6 +25,7 @@ class Config(BaseSettings):
     
     # Agent settings
     default_agent: str = "cursor"
+    env_file_path: str = ".env"  # Path to environment file relative to repository root
     
     # Logging
     log_level: str = "INFO"
@@ -38,7 +39,6 @@ class Config(BaseSettings):
         return v.upper()
     
     model_config = ConfigDict(
-        env_prefix="STACKBENCH_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore"  # Allow extra fields like API keys

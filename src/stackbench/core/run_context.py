@@ -25,6 +25,7 @@ class RunConfig(BaseModel):
     
     # Agent settings
     agent_type: str = Field(default_factory=lambda: get_config().default_agent)
+    env_file_path: str = Field(default_factory=lambda: get_config().env_file_path)
     
     # DSPy settings
     dspy_model: str = Field(default_factory=lambda: get_config().dspy_model)
