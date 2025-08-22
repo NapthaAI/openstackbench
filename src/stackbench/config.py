@@ -40,7 +40,8 @@ class Config(BaseSettings):
     model_config = ConfigDict(
         env_prefix="STACKBENCH_",
         env_file=".env",
-        env_file_encoding="utf-8"
+        env_file_encoding="utf-8",
+        extra="ignore"  # Allow extra fields like API keys
     )
 
 
