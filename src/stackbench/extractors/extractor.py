@@ -1,11 +1,13 @@
 """Main extraction logic with parallel processing and early stopping."""
 
 import json
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List
 
 import dspy
+from dotenv import load_dotenv
 
 from ..config import get_config
 from ..core.run_context import RunContext
@@ -16,6 +18,16 @@ from .utils import find_markdown_files, load_documents
 
 def setup_dspy():
     """Initialize DSPy with configuration."""
+    # Load .env file to ensure API keys are available
+    load_dotenv()
+    
+    # Check if required API key is available
+    if not os.getenv("OPENAI_API_KEY"):
+        raise ValueError(
+            "OPENAI_API_KEY not found in environment variables. "
+            "Please add it to your .env file or set it as an environment variable."
+        )
+    
     config = get_config()
     lm = dspy.LM(
         model=config.dspy_model,
@@ -29,6 +41,15 @@ def process_single_document(document: Document) -> List[UseCase]:
     """Process a single document and return validated use cases."""
     processor = DocumentProcessor()
     return processor.process_document(document)
+
+
+def get_relative_path(file_path, repo_dir):
+    """Get relative path from repo directory for cleaner logging."""
+    try:
+        return str(file_path.relative_to(repo_dir))
+    except ValueError:
+        # If file is not under repo_dir, just return the name
+        return file_path.name
 
 
 def extract_use_cases(context: RunContext) -> ExtractionResult:
@@ -114,13 +135,16 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
                 if use_cases:
                     all_use_cases.extend(use_cases)
                     documents_with_use_cases += 1
-                    print(f"Processed {document.file_path.name}: {len(use_cases)} use cases "
+                    relative_path = get_relative_path(document.file_path, context.repo_dir)
+                    print(f"Processed {relative_path}: {len(use_cases)} use cases "
                           f"(total: {len(all_use_cases)}/{context.config.num_use_cases})")
                 else:
-                    print(f"Processed {document.file_path.name}: no use cases found")
+                    relative_path = get_relative_path(document.file_path, context.repo_dir)
+                    print(f"Processed {relative_path}: no use cases found")
                 
             except Exception as e:
-                error_msg = f"Error processing {document.file_path}: {e}"
+                relative_path = get_relative_path(document.file_path, context.repo_dir)
+                error_msg = f"Error processing {relative_path}: {e}"
                 errors.append(error_msg)
                 print(error_msg)
             

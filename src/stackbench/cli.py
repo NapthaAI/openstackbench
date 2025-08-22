@@ -204,6 +204,7 @@ def list_runs():
 @click.argument("run_id")
 def extract(run_id: str):
     """Extract use cases from a cloned repository."""
+    show_logo()
     try:
         # Load run context
         context = RunContext.load(run_id)
