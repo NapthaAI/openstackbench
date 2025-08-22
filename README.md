@@ -103,15 +103,35 @@ This command:
 - Updates run phase to "extracted"
 - Shows next steps based on agent type
 
+**`stackbench print-prompt <run-id> --use-case <n>`**
+Print formatted prompt for manual execution of a specific use case.
+
+```bash
+# Print prompt for use case 1
+stackbench print-prompt 4a72004a-592b-49b7-9920-08cf54485f85 -u 1
+
+# Override agent type for different prompt format  
+stackbench print-prompt <run-id> -u 2 --agent cursor
+```
+
+This command:
+- Validates the run has extracted use cases
+- Loads the specific use case details
+- Formats a comprehensive prompt for the agent type
+- Shows target directory and next steps
+- Currently supports Cursor IDE agent
+
 ### Workflow Examples
 
 **Manual IDE Workflow (Cursor)**:
 ```bash
 stackbench clone https://github.com/user/lib -i docs
-stackbench list                    # Get run ID
-stackbench extract <run-id>        # Generate use cases
-# Manual execution in Cursor IDE
-stackbench analyze <run-id>        # Process results
+stackbench list                         # Get run ID
+stackbench extract <run-id>             # Generate use cases
+stackbench print-prompt <run-id> -u 1   # Get formatted prompt for use case 1
+# Copy prompt and implement in Cursor IDE
+stackbench print-prompt <run-id> -u 2   # Continue with remaining use cases
+stackbench analyze <run-id>             # Process results when all complete
 ```
 
 **Automated CLI Workflow** (Future):
