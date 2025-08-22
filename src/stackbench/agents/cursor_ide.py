@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from .base import Agent
+from ..config import get_config
 
 
 class CursorIDEAgent(Agent):
@@ -72,6 +73,8 @@ Please implement the use case described above.
 **File Creation:** Create a single entry file called `{use_case.target_file}` (solution.py or solution.js depending on the library language).
 
 **Target Directory:** Create the directory `{relative_target_dir}` if it doesn't exist. All files that you decide to create should be placed in this directory.
+
+**Environment Setup:** Check for and load any environment file at `{context.config.env_file_path}` (relative to your current working directory) if it exists. This may contain important configuration variables, API keys, or settings needed for the library to work properly.
 
 ### Implementation Requirements:
 - Meet all functional requirements listed above
