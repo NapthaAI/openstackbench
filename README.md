@@ -110,6 +110,9 @@ Print formatted prompt for manual execution of a specific use case.
 # Print prompt for use case 1
 stackbench print-prompt 4a72004a-592b-49b7-9920-08cf54485f85 -u 1
 
+# Print prompt and copy to clipboard automatically
+stackbench print-prompt 4a72004a-592b-49b7-9920-08cf54485f85 -u 1 --copy
+
 # Override agent type for different prompt format  
 stackbench print-prompt <run-id> -u 2 --agent cursor
 ```
@@ -118,6 +121,8 @@ This command:
 - Validates the run has extracted use cases
 - Loads the specific use case details
 - Formats a comprehensive prompt for the agent type
+- **Displays prompt with clear start/end boundaries**
+- **Optional clipboard copy** with `--copy/-c` flag
 - Shows target directory and next steps
 - Currently supports Cursor IDE agent
 
@@ -126,12 +131,12 @@ This command:
 **Manual IDE Workflow (Cursor)**:
 ```bash
 stackbench clone https://github.com/user/lib -i docs
-stackbench list                         # Get run ID
-stackbench extract <run-id>             # Generate use cases
-stackbench print-prompt <run-id> -u 1   # Get formatted prompt for use case 1
-# Copy prompt and implement in Cursor IDE
-stackbench print-prompt <run-id> -u 2   # Continue with remaining use cases
-stackbench analyze <run-id>             # Process results when all complete
+stackbench list                           # Get run ID
+stackbench extract <run-id>               # Generate use cases
+stackbench print-prompt <run-id> -u 1 -c # Get formatted prompt + copy to clipboard
+# Paste prompt and implement in Cursor IDE
+stackbench print-prompt <run-id> -u 2 -c # Continue with remaining use cases
+stackbench analyze <run-id>               # Process results when all complete
 ```
 
 **Automated CLI Workflow** (Future):

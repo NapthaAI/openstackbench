@@ -296,7 +296,8 @@ def extract(run_id: str):
 @click.argument("run_id")
 @click.option("--use-case", "-u", type=int, required=True, help="Use case number (1-based)")
 @click.option("--agent", "-a", default=None, help="Agent type override (default: use run config)")
-def print_prompt(run_id: str, use_case: int, agent: Optional[str]):
+@click.option("--copy", "-c", is_flag=True, help="Copy prompt to clipboard")
+def print_prompt(run_id: str, use_case: int, agent: Optional[str], copy: bool):
     """Print formatted prompt for manual execution of a specific use case."""
     try:
         # Load run context
@@ -326,10 +327,33 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str]):
             console.print(f"[bold red]✗[/bold red] {e}")
             sys.exit(1)
         
-        # Display prompt
+        # Display prompt with clear demarcation
         console.print(f"[bold blue]Use Case {use_case} Prompt for {agent_name.title()}:[/bold blue]")
         console.print()
+        
+        # Prompt start marker
+        console.print("[bold cyan]╭─── PROMPT START ─────────────────────────────────────────────────────────────╮[/bold cyan]")
+        console.print()
+        
+        # Clean prompt content (without rich formatting for clipboard)
         console.print(prompt)
+        
+        console.print()
+        console.print("[bold cyan]╰─── PROMPT END ───────────────────────────────────────────────────────────────╯[/bold cyan]")
+        
+        # Handle clipboard copy if requested
+        if copy:
+            try:
+                import pyperclip
+                pyperclip.copy(prompt)
+                console.print()
+                console.print("[bold green]✓[/bold green] Prompt copied to clipboard!")
+            except ImportError:
+                console.print()
+                console.print("[yellow]⚠[/yellow] pyperclip not available. Install with: uv add pyperclip")
+            except Exception as e:
+                console.print()
+                console.print(f"[yellow]⚠[/yellow] Failed to copy to clipboard: {e}")
         
         # Show helpful next steps
         target_dir = cursor_agent.get_target_directory(run_id, use_case)
@@ -340,7 +364,10 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str]):
             relative_target_dir = target_dir
         
         console.print(f"\n[bold]Next Steps:[/bold]")
-        console.print(f"[yellow]1.[/yellow] Copy the prompt above")
+        if copy:
+            console.print(f"[yellow]1.[/yellow] Paste the prompt from clipboard into Cursor IDE")
+        else:
+            console.print(f"[yellow]1.[/yellow] Copy the prompt above (or use --copy flag)")
         console.print(f"[yellow]2.[/yellow] Open Cursor IDE in the repository directory")
         console.print(f"[yellow]3.[/yellow] Create your solution in: [cyan]{relative_target_dir}/solution.py[/cyan]")
         console.print(f"[yellow]4.[/yellow] Use 'stackbench analyze {run_id}' when all use cases are complete")
