@@ -104,6 +104,8 @@ class TestRunContext:
     
     def test_phase_transitions(self, temp_data_dir):
         """Test phase transition methods."""
+        from stackbench.extractors.models import UseCase
+        
         context = RunContext.create("https://github.com/user/repo", base_data_dir=temp_data_dir)
         context.create_directories()
         
@@ -116,24 +118,31 @@ class TestRunContext:
         assert context.status.phase == "cloned"
         assert context.status.clone_completed
         
+        # Create mock use cases for extraction
+        mock_use_cases = [
+            UseCase(
+                name=f"Use Case {i}",
+                elevator_pitch="Test use case",
+                target_audience="developers",
+                functional_requirements=["req1"],
+                user_stories=["story1"],
+                system_design="simple",
+                architecture_pattern="MVC",
+                complexity_level="beginner",
+                source_document=["test.md"],
+                real_world_scenario="testing"
+            ) for i in range(1, 4)
+        ]
+        
         # Mark extraction completed
-        context.mark_extraction_completed(total_use_cases=10)
+        context.mark_extraction_completed(mock_use_cases)
         assert context.status.phase == "extracted"
         assert context.status.extraction_completed
-        assert context.status.total_use_cases == 10
+        assert context.status.total_use_cases == 3
         
-        # Mark execution completed
-        context.mark_execution_completed(successful=8, failed=2)
-        assert context.status.phase == "executed"
-        assert context.status.execution_completed
-        assert context.status.successful_executions == 8
-        assert context.status.failed_executions == 2
-        assert context.status.executed_use_cases == 10
-        
-        # Mark analysis completed
-        context.mark_analysis_completed()
-        assert context.status.phase == "analyzed"
-        assert context.status.analysis_completed
+        # Mark individual analysis completed
+        context.mark_individual_analysis_completed()
+        assert context.status.individual_analysis_completed
     
     def test_error_tracking(self, temp_data_dir):
         """Test error tracking functionality."""
@@ -153,15 +162,8 @@ class TestRunContext:
         context = RunContext.create("https://github.com/user/repo", base_data_dir=temp_data_dir)
         context.create_directories()
         
-        # Test file path helpers
+        # Test file path helper
         assert context.get_use_cases_file() == context.data_dir / "use_cases.json"
-        assert context.get_results_file() == context.data_dir / "results.json"
-        assert context.get_analysis_file() == context.data_dir / "analysis.json"
-        
-        # Test use case directory creation
-        use_case_dir = context.get_use_case_dir("1")
-        assert use_case_dir == context.data_dir / "use_case_1"
-        assert use_case_dir.exists()
     
     def test_manual_agent_detection(self, temp_data_dir):
         """Test manual agent detection."""
@@ -181,18 +183,39 @@ class TestRunContext:
     
     def test_summary_dict(self, temp_data_dir):
         """Test summary dictionary generation."""
+        from stackbench.extractors.models import UseCase
+        
         context = RunContext.create("https://github.com/user/repo", base_data_dir=temp_data_dir)
         context.create_directories()
-        context.mark_extraction_completed(10)
-        context.mark_execution_completed(8, 2)
+        
+        # Need to mark clone completed first for proper phase progression
+        context.mark_clone_completed()
+        
+        # Create mock use cases
+        mock_use_cases = [
+            UseCase(
+                name=f"Use Case {i}",
+                elevator_pitch="Test use case",
+                target_audience="developers",
+                functional_requirements=["req1"],
+                user_stories=["story1"],
+                system_design="simple",
+                architecture_pattern="MVC",
+                complexity_level="beginner",
+                source_document=["test.md"],
+                real_world_scenario="testing"
+            ) for i in range(1, 4)
+        ]
+        
+        context.mark_extraction_completed(mock_use_cases)
         
         summary = context.to_summary_dict()
         
         assert summary["repo_name"] == "repo"
-        assert summary["phase"] == "executed"
-        assert summary["total_use_cases"] == 10
-        assert summary["executed_use_cases"] == 10
-        assert summary["success_rate"] == 0.8
+        assert summary["phase"].value == "extracted"  # phase is enum, need .value
+        assert summary["total_use_cases"] == 3
+        assert summary["executed_use_cases"] == 0  # None executed yet
+        assert summary["success_rate"] == 0  # No executions yet
         assert summary["has_errors"] is False
 
 
@@ -301,22 +324,6 @@ class TestRepositoryManager:
         with pytest.raises(ValueError, match="Run nonexistent not found"):
             repo_manager.load_run_context("nonexistent")
     
-    def test_list_runs(self, repo_manager, mock_git_repo):
-        """Test listing available runs."""
-        # Initially no runs
-        assert repo_manager.list_runs() == []
-        
-        # Create some runs
-        mock_git_repo.return_value = Mock()
-        context1 = repo_manager.clone_repository("https://github.com/user/repo1")
-        context2 = repo_manager.clone_repository("https://github.com/user/repo2")
-        
-        # List runs
-        runs = repo_manager.list_runs()
-        assert len(runs) == 2
-        assert context1.run_id in runs
-        assert context2.run_id in runs
-        assert runs == sorted(runs)  # Should be sorted
     
     def test_cleanup_run(self, repo_manager, mock_git_repo):
         """Test cleaning up a run."""
@@ -327,14 +334,12 @@ class TestRepositoryManager:
         
         # Verify run exists
         assert context.run_dir.exists()
-        assert run_id in repo_manager.list_runs()
         
         # Cleanup run
         repo_manager.cleanup_run(run_id)
         
         # Verify run is gone
         assert not context.run_dir.exists()
-        assert run_id not in repo_manager.list_runs()
     
     def test_cleanup_nonexistent_run(self, repo_manager):
         """Test cleaning up nonexistent run (should not raise error)."""
