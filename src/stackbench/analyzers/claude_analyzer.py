@@ -12,6 +12,7 @@ from ..config import get_config, find_env_file
 from ..core.run_context import RunContext
 from ..extractors.models import UseCase
 from ..extractors.extractor import load_use_cases
+from .models import UseCaseAnalysisResult
 
 class ClaudeAnalyzer:
     """Claude Code-powered analyzer for use case implementations."""
@@ -174,54 +175,13 @@ Since IDE agents don't have tool usage logs, analyze documentation usage from:
 ## Required JSON Output
 Save your analysis as a JSON file with this structure:
 
+**IMPORTANT:** Use `"partial"` for is_executable when code runs but has limitations/issues.
+
 ```json
-{{
-  "use_case_number": {use_case_number},
-  "use_case_name": "{use_case.name}",
-  "code_executability": {{
-    "is_executable": true/false,
-    "execution_result": "Success output or error message",
-    "failure_reason": "Specific reason if failed",
-    "test_results": "Additional testing results",
-    "failed_due_to_api_key_error": true/false
-  }},
-  "underlying_library_usage": {{
-    "was_used": true/false,
-    "was_mocked": true/false,
-    "mocking_reason": "Why mocking was chosen if applicable",
-    "mocking_decision_trace": {{
-      "initial_attempts": [],
-      "alternative_approaches": [],
-      "final_decision_point": "Decision reasoning",
-      "mock_strategy": "How mocking was implemented"
-    }}
-  }},
-  "documentation_tracking": {{
-    "files_consulted": ["list of files from comments"],
-    "implementation_notes": ["notes from code comments"],
-    "evidence_of_usage": "How docs were applied in implementation"
-  }},
-  "quality_assessment": {{
-    "completeness_score": "0-10 with reasoning",
-    "clarity_score": "0-10 with reasoning", 
-    "accuracy_score": "0-10 with reasoning",
-    "example_quality_score": "0-10 with reasoning",
-    "overall_score": "0-10 overall assessment",
-    "agent_readiness": "ready|needs_improvement|not_ready"
-  }},
-  "improvement_recommendations": [
-    {{
-      "priority": "critical|high|medium|low",
-      "category": "missing_info|unclear_explanation|poor_examples|structure",
-      "issue": "Specific problem identified",
-      "recommendation": "Specific improvement needed",
-      "expected_impact": "How this would help future agents"
-    }}
-  ]
-}}
+{UseCaseAnalysisResult.generate_json_example()}
 ```
 
-**Save the analysis to:** `{relative_target_file.parent}/use_case_{use_case_number}_analysis.json`
+**Save the analysis to:** `{target_file_path.parent.absolute()}/use_case_{use_case_number}_analysis.json`
 """
         return prompt
     
@@ -314,34 +274,6 @@ Save your analysis as a JSON file with this structure:
                     
                     if self.verbose:
                         print(f"[Worker] Message: {message}")
-                    
-                    if hasattr(message, 'content'):
-                        for block in message.content:
-                            if hasattr(block, 'text'):
-                                analysis_text.append(block.text)
-                                # Show text content snippets in verbose mode
-                                if self.verbose:
-                                    text_preview = block.text[:200] + "..." if len(block.text) > 200 else block.text
-                                    print(f"[Worker] Text content: {text_preview}")
-                                # Show partial progress for long analysis
-                                elif len(analysis_text) % 5 == 0:
-                                    print(f"[Worker] Use case {use_case_number}: Received {len(analysis_text)} response blocks...")
-                            elif hasattr(block, 'type') and block.type == 'tool_use':
-                                tool_name = getattr(block, 'name', 'unknown')
-                                print(f"[Worker] Use case {use_case_number}: 🔧 Executing {tool_name} tool")
-                                if self.verbose and hasattr(block, 'input'):
-                                    print(f"[Worker] Tool input: {block.input}")
-                            elif hasattr(block, 'type') and block.type == 'tool_result':
-                                print(f"[Worker] Use case {use_case_number}: ✅ Tool completed")
-                                if self.verbose and hasattr(block, 'content'):
-                                    result_preview = str(block.content)[:200] + "..." if len(str(block.content)) > 200 else str(block.content)
-                                    print(f"[Worker] Tool result: {result_preview}")
-                    elif hasattr(message, 'type'):
-                        # Handle other message types
-                        if message.type == 'tool_use':
-                            print(f"[Worker] Use case {use_case_number}: Tool execution in progress...")
-                        elif self.verbose:
-                            print(f"[Worker] Message type: {message.type}")
                 
                 print(f"[Worker] Use case {use_case_number}: Analysis completed after {turn_count} turns")
                 print(f"[Worker] Use case {use_case_number}: Collected {len(messages)} messages total")
@@ -485,79 +417,10 @@ Save your analysis as a JSON file with this structure:
         # Sort results by use case number to maintain order
         use_case_results = sorted(completed_results, key=lambda x: x.get("use_case_number", 0))
         
-        # Calculate success metrics
-        successful_cases = 0
-        failed_cases = 0
-        
-        for result in use_case_results:
-            if result.get("code_executability", {}).get("is_executable", False):
-                successful_cases += 1
-            else:
-                failed_cases += 1
-        
-        # Calculate overall summary
-        from .models import OverallSummary, CommonFailurePattern
-        total_cases = len(use_cases)
-        success_rate = (successful_cases / total_cases) if total_cases > 0 else 0.0
-        pass_fail_status = "PASS" if success_rate >= 0.5 else "FAIL"
-        
-        overall_summary = OverallSummary(
-            pass_fail_status=pass_fail_status,
-            success_rate=success_rate,
-            total_use_cases=total_cases,
-            successful_cases=successful_cases,
-            failed_cases=failed_cases
-        )
-        
-        # Analyze common failure patterns (simplified for now)
-        common_failures = []
-        if failed_cases > 0:
-            # Group failures by common patterns
-            error_patterns = {}
-            for result in use_case_results:
-                if not result.get("code_executability", {}).get("is_executable", False):
-                    failure_reason = result.get("code_executability", {}).get("failure_reason", "Unknown error")
-                    if "import" in failure_reason.lower() or "module" in failure_reason.lower():
-                        pattern = "Import/Module Errors"
-                    elif "api" in failure_reason.lower() or "key" in failure_reason.lower():
-                        pattern = "API Key/Authentication Issues"  
-                    elif "mock" in failure_reason.lower():
-                        pattern = "Mocked Implementation"
-                    else:
-                        pattern = "Other Execution Errors"
-                    
-                    if pattern not in error_patterns:
-                        error_patterns[pattern] = []
-                    error_patterns[pattern].append(failure_reason)
-            
-            for pattern, examples in error_patterns.items():
-                common_failures.append(CommonFailurePattern(
-                    pattern=pattern,
-                    frequency=len(examples),
-                    examples=examples[:3],  # Keep top 3 examples
-                    impact=f"Affects {len(examples)}/{total_cases} use cases"
-                ))
-        
-        # Create final analysis result
-        analysis_result = {
-            "run_id": run_id,
-            "repository_url": context.config.repo_url,
-            "analysis_timestamp": overall_summary.analyzed_at.isoformat(),
-            "overall_summary": overall_summary.model_dump(),
-            "common_failures": [cf.model_dump() for cf in common_failures],
-            "framework_insights": [],  # TODO: Implement framework-specific insights
-            "use_case_results": use_case_results
-        }
-        
-        # Save results
-        results_file = context.data_dir / "results.json"
-        with open(results_file, 'w') as f:
-            json.dump(analysis_result, f, indent=2, default=str)
-        
         # Update run context
         context.mark_analysis_completed()
         
-        return analysis_result
+        return use_case_results
     
     async def analyze_single_use_case(self, run_id: str, use_case_number: int) -> Dict:
         """Analyze a single specific use case."""

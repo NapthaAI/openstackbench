@@ -6,142 +6,119 @@ Validates that analysis output meets StackBench's required JSON structure.
 import json
 import sys
 import os
+from pathlib import Path
+
+# Add the src directory to Python path so we can import our models
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root / "src"))
+
+try:
+    from stackbench.analyzers.models import UseCaseAnalysisResult
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+    print("⚠️ Could not import Pydantic models, falling back to manual validation", file=sys.stderr)
 
 def show_required_structure():
     """Show the required JSON structure for StackBench analysis output"""
-    example = {
-        "use_case_number": 1,
-        "use_case_name": "Example Use Case",
-        "code_executability": {
-            "is_executable": True,
-            "execution_result": "success output or error message",
-            "failure_reason": "specific reason if failed",
-            "test_results": "additional testing results",
-            "failed_due_to_api_key_error": False
-        },
-        "underlying_library_usage": {
-            "was_used": True,
-            "was_mocked": False,
-            "mocking_reason": "reason for mocking if applicable",
-            "mocking_decision_trace": {
-                "initial_attempts": ["list of initial attempts"],
-                "alternative_approaches": ["list of alternative approaches"],
-                "final_decision_point": "decision reasoning",
-                "mock_strategy": "how mocking was implemented"
-            }
-        },
-        "documentation_tracking": {
-            "files_consulted": ["README.md", "docs/api.md"],
-            "implementation_notes": ["notes from code comments"],
-            "evidence_of_usage": "how documentation was applied"
-        },
-        "quality_assessment": {
-            "completeness_score": "0-10 with reasoning",
-            "clarity_score": "0-10 with reasoning", 
-            "accuracy_score": "0-10 with reasoning",
-            "example_quality_score": "0-10 with reasoning",
-            "overall_score": "0-10 overall assessment",
-            "agent_readiness": "ready|needs_improvement|not_ready"
-        },
-        "improvement_recommendations": [
-            {
-                "priority": "critical|high|medium|low",
-                "category": "missing_info|unclear_explanation|poor_examples|structure",
-                "issue": "specific problem identified",
-                "recommendation": "specific improvement needed",
-                "expected_impact": "how this would help future agents"
-            }
-        ]
-    }
-    return json.dumps(example, indent=2)
+    if PYDANTIC_AVAILABLE:
+        return UseCaseAnalysisResult.generate_json_example()
+    else:
+        # Fallback example for when Pydantic is not available
+        example = {
+            "use_case_number": 1,
+            "use_case_name": "Example Use Case",
+            "code_executability": {
+                "is_executable": "true/false/\"partial\"",
+                "execution_result": "success output or error message",
+                "failure_reason": "specific reason if failed",
+                "test_results": "additional testing results",
+                "failed_due_to_api_key_error": "true/false"
+            },
+            "underlying_library_usage": {
+                "was_used": "true/false",
+                "was_mocked": "true/false",
+                "mocking_reason": "reason for mocking if applicable",
+                "mocking_decision_trace": {
+                    "initial_attempts": ["list of initial attempts"],
+                    "alternative_approaches": ["list of alternative approaches"],
+                    "final_decision_point": "decision reasoning",
+                    "mock_strategy": "how mocking was implemented"
+                }
+            },
+            "documentation_tracking": {
+                "files_consulted": ["README.md", "docs/api.md"],
+                "implementation_notes": ["notes from code comments"],
+                "evidence_of_usage": "how documentation was applied"
+            },
+            "quality_assessment": {
+                "completeness_score": "0-10 with reasoning",
+                "clarity_score": "0-10 with reasoning", 
+                "accuracy_score": "0-10 with reasoning",
+                "example_quality_score": "0-10 with reasoning",
+                "overall_score": "0-10 overall assessment",
+                "agent_readiness": "ready|needs_improvement|not_ready"
+            },
+            "improvement_recommendations": [
+                {
+                    "priority": "critical|high|medium|low",
+                    "category": "missing_info|unclear_explanation|poor_examples|structure",
+                    "issue": "specific problem identified",
+                    "recommendation": "specific improvement needed",
+                    "expected_impact": "how this would help future agents"
+                }
+            ]
+        }
+        return json.dumps(example, indent=2)
 
 def validate_stackbench_json_structure(data, filename):
-    """Validate StackBench analysis JSON structure."""
+    """Validate StackBench analysis JSON structure using Pydantic."""
+    if PYDANTIC_AVAILABLE:
+        try:
+            # Use Pydantic to validate the entire structure
+            result = UseCaseAnalysisResult.model_validate(data)
+            return True, []
+        except Exception as e:
+            # Pydantic validation failed
+            error_msg = str(e)
+            # Make Pydantic errors more user-friendly
+            if "validation error" in error_msg.lower():
+                return False, [f"Pydantic validation failed: {error_msg}"]
+            else:
+                return False, [f"JSON structure validation failed: {error_msg}"]
+    else:
+        # Fallback to manual validation when Pydantic is not available
+        return validate_stackbench_json_structure_manual(data, filename)
+
+def validate_stackbench_json_structure_manual(data, filename):
+    """Manual validation fallback when Pydantic is not available."""
     errors = []
     
     # Required top-level keys for StackBench
     required_keys = [
-        "use_case_number",
-        "use_case_name", 
-        "code_executability",
-        "underlying_library_usage",
-        "documentation_tracking",
-        "quality_assessment",
-        "improvement_recommendations"
+        "use_case_number", "use_case_name", "code_executability",
+        "underlying_library_usage", "documentation_tracking",
+        "quality_assessment", "improvement_recommendations"
     ]
     
     for key in required_keys:
         if key not in data:
             errors.append(f"Missing required top-level key: '{key}'")
     
-    # Basic type checking
-    expected_types = {
-        "use_case_number": int,
-        "use_case_name": str,
-        "code_executability": dict,
-        "underlying_library_usage": dict,
-        "documentation_tracking": dict,
-        "quality_assessment": dict,
-        "improvement_recommendations": list
-    }
-    
-    for key, expected_type in expected_types.items():
-        if key in data and not isinstance(data[key], expected_type):
-            errors.append(f"'{key}' should be {expected_type.__name__}, got {type(data[key]).__name__}")
-    
-    # Validate code_executability structure
-    if "code_executability" in data and isinstance(data.get("code_executability"), dict):
+    # Validate is_executable supports "partial"
+    if "code_executability" in data:
         exec_data = data["code_executability"]
-        required_exec_fields = ["is_executable", "failed_due_to_api_key_error"]
-        for field in required_exec_fields:
-            if field not in exec_data:
+        if "is_executable" in exec_data:
+            is_exec = exec_data["is_executable"]
+            if not (isinstance(is_exec, bool) or is_exec == "partial"):
+                errors.append("'is_executable' should be true, false, or \"partial\"")
+    
+    # Basic required field validation
+    if "code_executability" in data:
+        exec_fields = ["is_executable", "execution_result", "failed_due_to_api_key_error"]
+        for field in exec_fields:
+            if field not in data["code_executability"]:
                 errors.append(f"Missing '{field}' in 'code_executability'")
-            elif not isinstance(exec_data.get(field), bool):
-                errors.append(f"'{field}' should be boolean in 'code_executability'")
-
-    # Validate underlying_library_usage structure  
-    if "underlying_library_usage" in data and isinstance(data.get("underlying_library_usage"), dict):
-        lib_usage = data["underlying_library_usage"]
-        required_lib_fields = ["was_used", "was_mocked"]
-        for field in required_lib_fields:
-            if field not in lib_usage:
-                errors.append(f"Missing '{field}' in 'underlying_library_usage'")
-            elif not isinstance(lib_usage.get(field), bool):
-                errors.append(f"'{field}' should be boolean in 'underlying_library_usage'")
-        
-        # Validate mocking_decision_trace if present (optional)
-        if "mocking_decision_trace" in lib_usage:
-            trace = lib_usage["mocking_decision_trace"]
-            if not isinstance(trace, dict):
-                errors.append("'mocking_decision_trace' should be an object")
-
-    # Validate documentation_tracking structure
-    if "documentation_tracking" in data and isinstance(data.get("documentation_tracking"), dict):
-        doc_tracking = data["documentation_tracking"]
-        if "files_consulted" in doc_tracking and not isinstance(doc_tracking.get("files_consulted"), list):
-            errors.append("'files_consulted' should be an array in 'documentation_tracking'")
-        if "implementation_notes" in doc_tracking and not isinstance(doc_tracking.get("implementation_notes"), list):
-            errors.append("'implementation_notes' should be an array in 'documentation_tracking'")
-    
-    # Validate quality_assessment structure
-    if "quality_assessment" in data and isinstance(data.get("quality_assessment"), dict):
-        quality = data["quality_assessment"]
-        required_quality_fields = ["completeness_score", "clarity_score", "accuracy_score",
-                                 "example_quality_score", "overall_score", "agent_readiness"]
-        for field in required_quality_fields:
-            if field not in quality:
-                errors.append(f"Missing '{field}' in 'quality_assessment'")
-    
-    # Validate improvement_recommendations structure
-    if "improvement_recommendations" in data and isinstance(data.get("improvement_recommendations"), list):
-        for i, rec in enumerate(data["improvement_recommendations"]):
-            if not isinstance(rec, dict):
-                errors.append(f"improvement_recommendations[{i}] should be an object")
-            else:
-                required_rec_fields = ["priority", "category", "issue", "recommendation", "expected_impact"]
-                for field in required_rec_fields:
-                    if field not in rec:
-                        errors.append(f"Missing '{field}' in improvement_recommendations[{i}]")
     
     return len(errors) == 0, errors
 
@@ -216,7 +193,18 @@ def main():
                 files_consulted = file_content.get("documentation_tracking", {}).get("files_consulted", [])
                 overall_score = file_content.get("quality_assessment", {}).get("overall_score", "N/A")
                 
-                print(f"📊 Use Case {use_case_number}: Executable={is_executable}, Mocked={was_mocked}, DocsUsed={len(files_consulted)}, Score='{overall_score}'", file=sys.stderr)
+                # Handle partial executable status
+                exec_status = is_executable
+                if exec_status == "partial":
+                    exec_status = "PARTIAL"
+                elif exec_status is True:
+                    exec_status = "YES"
+                elif exec_status is False:
+                    exec_status = "NO"
+                else:
+                    exec_status = str(exec_status)
+                    
+                print(f"📊 Use Case {use_case_number}: Executable={exec_status}, Mocked={was_mocked}, DocsUsed={len(files_consulted)}, Score='{overall_score}'", file=sys.stderr)
             except Exception as e:
                 print(f"Could not print stats due to an error: {e}", file=sys.stderr)
         else:

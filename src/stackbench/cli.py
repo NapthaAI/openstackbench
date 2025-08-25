@@ -530,21 +530,27 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
             console.print()
             console.print("[bold green]✓[/bold green] Analysis completed successfully!")
             
-            # Show summary
-            summary = result["overall_summary"]
+            # Show simple summary since we're not generating overall results
+            total_cases = len(result)
+            successful_cases = sum(1 for r in result if r.get("code_executability", {}).get("is_executable") in [True, "partial"])
+            
             console.print(f"[bold]Results Summary:[/bold]")
-            console.print(f"Status: [{'green' if summary['pass_fail_status'] == 'PASS' else 'red'}]{summary['pass_fail_status']}[/{'green' if summary['pass_fail_status'] == 'PASS' else 'red'}]")
-            console.print(f"Success Rate: [cyan]{summary['successful_cases']}/{summary['total_use_cases']} ({summary['success_rate']:.1%})[/cyan]")
+            console.print(f"Total Use Cases: [cyan]{total_cases}[/cyan]")
+            console.print(f"Successful/Partial: [cyan]{successful_cases}[/cyan]")
+            console.print(f"Success Rate: [cyan]{successful_cases/total_cases:.1%}[/cyan]" if total_cases > 0 else "")
             
-            if result["common_failures"]:
-                console.print(f"[bold]Common Failure Patterns:[/bold]")
-                for failure in result["common_failures"][:3]:  # Show top 3
-                    console.print(f"• [red]{failure['pattern']}[/red] ({failure['frequency']} cases)")
-            
-            # Show file locations
-            console.print()
-            console.print(f"[bold]Output Files:[/bold]")
-            console.print(f"• Structured results: [cyan]{context.data_dir / 'results.json'}[/cyan]")
+            # Show individual use case results  
+            console.print(f"[bold]Use Case Results:[/bold]")
+            for use_case_result in result:
+                use_case_num = use_case_result.get("use_case_number", "?")
+                use_case_name = use_case_result.get("use_case_name", "Unknown")
+                is_executable = use_case_result.get("code_executability", {}).get("is_executable", False)
+                
+                status_color = "green" if is_executable in [True, "partial"] else "red"
+                status_text = "✓" if is_executable is True else "◐" if is_executable == "partial" else "✗"
+                exec_text = "PASS" if is_executable is True else "PARTIAL" if is_executable == "partial" else "FAIL"
+                
+                console.print(f"• [{status_color}]{status_text}[/{status_color}] Use Case {use_case_num}: {use_case_name} - [{status_color}]{exec_text}[/{status_color}]")
             
             if context.status.phase != "analyzed":
                 context.mark_analysis_completed()

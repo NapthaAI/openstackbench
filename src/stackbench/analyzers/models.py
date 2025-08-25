@@ -1,13 +1,14 @@
 """Pydantic models for analysis results."""
 
+import json
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union, Literal, Dict, Any
 from pydantic import BaseModel, Field
 
 
 class CodeExecutabilityResult(BaseModel):
     """Results of code execution testing."""
-    is_executable: bool
+    is_executable: Union[bool, Literal["partial"]]
     execution_result: str
     failure_reason: Optional[str] = None
     test_results: Optional[str] = None
@@ -23,8 +24,8 @@ class MockingDecisionTrace(BaseModel):
 
 class MockingAnalysis(BaseModel):
     """Analysis of mocking behavior in implementation."""
-    initial_attempts: List[MockingDecisionTrace] = Field(default_factory=list)
-    alternative_approaches: List[str] = Field(default_factory=list)
+    initial_attempts: List[str] = Field(default_factory=list, description="List of initial attempts made")
+    alternative_approaches: List[str] = Field(default_factory=list, description="List of alternative approaches tried")
     final_decision_point: Optional[str] = None
     mock_strategy: Optional[str] = None
 
@@ -35,6 +36,13 @@ class UnderlyingLibraryUsage(BaseModel):
     was_mocked: bool
     mocking_reason: Optional[str] = None
     mocking_decision_trace: MockingAnalysis = Field(default_factory=MockingAnalysis)
+
+
+class DocumentationTracking(BaseModel):
+    """Documentation tracking and usage analysis."""
+    files_consulted: List[str] = Field(default_factory=list, description="List of documentation files referenced in code comments")
+    implementation_notes: List[str] = Field(default_factory=list, description="Notes from code comments about implementation decisions")
+    evidence_of_usage: str = Field(description="How documentation was applied in the implementation")
 
 
 class DocumentationStrength(BaseModel):
@@ -94,3 +102,68 @@ class FrameworkInsight(BaseModel):
     insight: str
     evidence: List[str] = Field(default_factory=list)
     recommendation: str
+
+
+class UseCaseAnalysisResult(BaseModel):
+    """Complete analysis result for a single use case."""
+    use_case_number: int
+    use_case_name: str
+    code_executability: CodeExecutabilityResult
+    underlying_library_usage: UnderlyingLibraryUsage
+    documentation_tracking: DocumentationTracking
+    quality_assessment: QualityAssessment
+    improvement_recommendations: List[ImprovementRecommendation] = Field(default_factory=list)
+
+    @classmethod
+    def generate_json_example(cls) -> str:
+        """Generate a JSON example from the Pydantic schema with realistic values."""
+        example_data = {
+            "use_case_number": 1,
+            "use_case_name": "Example Use Case Implementation",
+            "code_executability": {
+                "is_executable": "true/false/\"partial\"",
+                "execution_result": "Success output or error message",
+                "failure_reason": "Specific reason if failed (optional)",
+                "test_results": "Additional testing results (optional)",
+                "failed_due_to_api_key_error": "true/false"
+            },
+            "underlying_library_usage": {
+                "was_used": "true/false",
+                "was_mocked": "true/false",
+                "mocking_reason": "Why mocking was chosen if applicable (optional)",
+                "mocking_decision_trace": {
+                    "initial_attempts": ["List of initial attempts made"],
+                    "alternative_approaches": ["List of alternative approaches tried"],
+                    "final_decision_point": "Decision reasoning (optional)",
+                    "mock_strategy": "How mocking was implemented (optional)"
+                }
+            },
+            "documentation_tracking": {
+                "files_consulted": ["README.md", "docs/api.md", "examples/basic_usage.py"],
+                "implementation_notes": ["Notes from code comments about decisions made"],
+                "evidence_of_usage": "How documentation was applied in the implementation"
+            },
+            "quality_assessment": {
+                "completeness_score": "0-10 with reasoning",
+                "clarity_score": "0-10 with reasoning", 
+                "accuracy_score": "0-10 with reasoning",
+                "example_quality_score": "0-10 with reasoning",
+                "overall_score": "0-10 overall assessment",
+                "agent_readiness": "ready|needs_improvement|not_ready"
+            },
+            "improvement_recommendations": [
+                {
+                    "priority": "critical|high|medium|low",
+                    "category": "missing_info|unclear_explanation|poor_examples|structure",
+                    "issue": "Specific problem identified",
+                    "recommendation": "Specific improvement needed",
+                    "expected_impact": "How this would help future agents"
+                }
+            ]
+        }
+        return json.dumps(example_data, indent=2)
+
+    @classmethod
+    def get_schema_info(cls) -> Dict[str, Any]:
+        """Get Pydantic schema information for validation."""
+        return cls.model_json_schema()
