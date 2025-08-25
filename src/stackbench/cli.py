@@ -143,8 +143,28 @@ def list_runs():
     """List all benchmark runs with their status."""
     show_logo()
     try:
-        repo_manager = RepositoryManager()
-        run_ids = repo_manager.list_runs()
+        # Get all run directories directly from data directory
+        config = get_config()
+        data_dir = config.data_dir
+        
+        if not data_dir.exists():
+            console.print("[yellow]No benchmark runs found.[/yellow]")
+            console.print("[dim]Use 'stackbench clone <repo-url>' to create a new run.[/dim]")
+            return
+            
+        # Find all valid run directories (UUID-named with run_context.json)
+        run_ids = []
+        for item in data_dir.iterdir():
+            if (item.is_dir() and 
+                len(item.name) == 36 and  # UUID length
+                (item / "run_context.json").exists()):
+                try:
+                    # Validate it's a UUID by trying to parse it
+                    import uuid
+                    uuid.UUID(item.name)
+                    run_ids.append(item.name)
+                except ValueError:
+                    continue
         
         if not run_ids:
             console.print("[yellow]No benchmark runs found.[/yellow]")

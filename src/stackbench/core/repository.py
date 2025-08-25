@@ -140,17 +140,6 @@ class RepositoryManager:
         """Load existing run context by ID."""
         return RunContext.load(run_id, self.base_data_dir)
     
-    def list_runs(self) -> List[str]:
-        """List all available run IDs."""
-        if not self.base_data_dir.exists():
-            return []
-        
-        runs = []
-        for item in self.base_data_dir.iterdir():
-            if item.is_dir() and (item / "run_context.json").exists():
-                runs.append(item.name)
-        
-        return sorted(runs)
     
     def cleanup_run(self, run_id: str) -> None:
         """Remove a run directory and all its contents."""
