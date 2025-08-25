@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 from ..config import get_config
 
@@ -145,34 +145,6 @@ class RunStatus(BaseModel):
         """Count of successfully executed use cases."""
         return sum(1 for uc in self.use_cases.values() if uc.execution_status == ExecutionStatus.EXECUTED)
     
-    @property
-    def execution_failed_count(self) -> int:
-        """Count of failed executions."""
-        return sum(1 for uc in self.use_cases.values() if uc.execution_status == ExecutionStatus.FAILED)
-    
-    @property
-    def analysis_success_count(self) -> int:
-        """Count of successfully analyzed use cases."""
-        return sum(1 for uc in self.use_cases.values() if uc.analysis_status == AnalysisStatus.ANALYZED)
-    
-    @property
-    def analysis_failed_count(self) -> int:
-        """Count of failed analyses."""
-        return sum(1 for uc in self.use_cases.values() if uc.analysis_status == AnalysisStatus.FAILED)
-    
-    @property
-    def execution_progress(self) -> float:
-        """Execution progress as a fraction (0.0 to 1.0)."""
-        if self.total_use_cases == 0:
-            return 0.0
-        return self.executed_count / self.total_use_cases
-    
-    @property
-    def analysis_progress(self) -> float:
-        """Analysis progress as a fraction (0.0 to 1.0)."""
-        if self.executed_count == 0:
-            return 0.0
-        return self.analyzed_count / self.executed_count
     
     def update_phase(self, new_phase: RunPhase) -> None:
         """Update the current phase and timestamp."""
@@ -247,42 +219,31 @@ class RunStatus(BaseModel):
         self.updated_at = datetime.now()
         return completed
     
-    # Progress query methods
-    def get_pending_execution(self) -> List[int]:
-        """Get list of use case numbers that need to be executed."""
-        return [num for num, uc in self.use_cases.items() 
-                if uc.execution_status == ExecutionStatus.NOT_EXECUTED]
-    
-    def get_pending_analysis(self) -> List[int]:
-        """Get list of use case numbers that can be analyzed but haven't been."""
-        return [num for num, uc in self.use_cases.items() 
-                if uc.can_be_analyzed and uc.analysis_status == AnalysisStatus.NOT_ANALYZED]
     
     def get_ready_for_analysis(self) -> List[int]:
         """Get use cases that are ready to be analyzed (executed with implementation files)."""
         return [num for num, uc in self.use_cases.items() if uc.can_be_analyzed]
     
-    # Phase transition logic
-    def is_ready_for_execution_phase(self) -> bool:
+    def _is_ready_for_execution_phase(self) -> bool:
         """Check if ready to enter execution phase."""
         return self.extraction_completed and len(self.use_cases) > 0
     
-    def is_ready_for_individual_analysis(self) -> bool:
+    def _is_ready_for_individual_analysis(self) -> bool:
         """Check if ready to start individual analysis phase."""
         return self.execution_phase_completed and self.executed_count > 0
     
-    def is_ready_for_overall_analysis(self) -> bool:
+    def _is_ready_for_overall_analysis(self) -> bool:
         """Check if ready for overall analysis (results.json/md generation)."""
         return (self.individual_analysis_completed and 
                 self.analyzed_count > 0)
     
-    def can_complete_execution_phase(self) -> bool:
+    def _can_complete_execution_phase(self) -> bool:
         """Check if execution phase can be marked as complete."""
         # For CLI agents: all use cases executed
         # For IDE agents: manually marked complete or all detected as implemented
         return self.executed_count == self.total_use_cases or self.execution_phase_completed
     
-    def can_complete_individual_analysis(self) -> bool:
+    def _can_complete_individual_analysis(self) -> bool:
         """Check if individual analysis phase can be marked as complete."""
         ready_count = len(self.get_ready_for_analysis())
         return ready_count > 0 and self.analyzed_count == ready_count
@@ -293,12 +254,12 @@ class RunStatus(BaseModel):
             self.update_phase(RunPhase.CLONED)
         elif self.phase == RunPhase.CLONED and self.extraction_completed:
             self.update_phase(RunPhase.EXTRACTED)
-        elif self.phase == RunPhase.EXTRACTED and self.is_ready_for_execution_phase():
+        elif self.phase == RunPhase.EXTRACTED and self._is_ready_for_execution_phase():
             self.update_phase(RunPhase.EXECUTION)
-        elif self.phase == RunPhase.EXECUTION and self.can_complete_execution_phase():
+        elif self.phase == RunPhase.EXECUTION and self._can_complete_execution_phase():
             self.execution_phase_completed = True
             self.update_phase(RunPhase.ANALYSIS_INDIVIDUAL)
-        elif self.phase == RunPhase.ANALYSIS_INDIVIDUAL and self.can_complete_individual_analysis():
+        elif self.phase == RunPhase.ANALYSIS_INDIVIDUAL and self._can_complete_individual_analysis():
             self.individual_analysis_completed = True
             self.update_phase(RunPhase.ANALYSIS_OVERALL)
         elif self.phase == RunPhase.ANALYSIS_OVERALL and self.overall_analysis_completed:
@@ -419,20 +380,6 @@ class RunContext(BaseModel):
         """Get path to use_cases.json file."""
         return self.data_dir / "use_cases.json"
     
-    def get_results_file(self) -> Path:
-        """Get path to results.json file."""
-        return self.data_dir / "results.json"
-    
-    def get_analysis_file(self) -> Path:
-        """Get path to analysis.json file."""
-        return self.data_dir / "analysis.json"
-    
-    def get_use_case_dir(self, use_case_id: str) -> Path:
-        """Get directory for a specific use case execution."""
-        use_case_dir = self.data_dir / f"use_case_{use_case_id}"
-        use_case_dir.mkdir(exist_ok=True)
-        return use_case_dir
-    
     def mark_clone_completed(self) -> None:
         """Mark the clone phase as completed."""
         self.status.clone_completed = True
@@ -446,21 +393,9 @@ class RunContext(BaseModel):
         self.status.update_phase_automatically()
         self.save()
     
-    def mark_execution_phase_completed(self) -> None:
-        """Mark the execution phase as completed."""
-        self.status.execution_phase_completed = True
-        self.status.update_phase_automatically()
-        self.save()
-    
     def mark_individual_analysis_completed(self) -> None:
         """Mark individual analysis phase as completed."""
         self.status.individual_analysis_completed = True
-        self.status.update_phase_automatically()
-        self.save()
-    
-    def mark_overall_analysis_completed(self) -> None:
-        """Mark overall analysis phase as completed."""
-        self.status.overall_analysis_completed = True
         self.status.update_phase_automatically()
         self.save()
     
