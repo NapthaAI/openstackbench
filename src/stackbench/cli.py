@@ -13,6 +13,7 @@ from .core.repository import RepositoryManager
 from .core.run_context import RunContext
 from .extractors.extractor import extract_use_cases
 from .agents.cursor_ide import CursorIDEAgent
+from .analyzers.claude_analyzer import ClaudeAnalyzer
 
 console = Console()
 
@@ -378,6 +379,115 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str], copy: bool):
         sys.exit(1)
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Failed to generate prompt: {e}")
+        sys.exit(1)
+
+
+@cli.command("analyze")
+@click.argument("run_id")
+@click.option("--use-case", "-u", type=int, help="Analyze specific use case only (1-based)")
+@click.option("--force", is_flag=True, help="Force re-analysis even if already completed")
+def analyze(run_id: str, use_case: Optional[int], force: bool):
+    """Analyze use case implementations using Claude Code."""
+    import asyncio
+    import os
+    
+    try:
+        # Check for Anthropic API key
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            console.print("[bold red]✗[/bold red] ANTHROPIC_API_KEY environment variable not found.")
+            console.print("[dim]Add your Anthropic API key to .env file or environment.[/dim]")
+            sys.exit(1)
+        
+        # Check if Node.js Claude Code CLI is installed
+        import subprocess
+        try:
+            result = subprocess.run(["claude", "--version"], capture_output=True, text=True)
+            if result.returncode != 0:
+                raise FileNotFoundError
+        except FileNotFoundError:
+            console.print("[bold red]✗[/bold red] Claude Code CLI not found.")
+            console.print("[dim]Install with: npm install -g @anthropic-ai/claude-code[/dim]")
+            sys.exit(1)
+        
+        # Load run context
+        try:
+            context = RunContext.load(run_id)
+        except FileNotFoundError:
+            console.print(f"[bold red]✗[/bold red] Run ID '{run_id}' not found.")
+            console.print("[dim]Use 'stackbench list' to see available runs.[/dim]")
+            sys.exit(1)
+        
+        # Validate run phase
+        if context.status.phase not in ["extracted", "executed", "analyzed"] and not force:
+            console.print(f"[bold red]✗[/bold red] Run must be extracted first, currently: {context.status.phase}")
+            if context.status.phase == "cloned":
+                console.print("[dim]Use 'stackbench extract <run-id>' first to generate use cases.[/dim]")
+            sys.exit(1)
+        
+        # Check if already analyzed and not forcing
+        if context.status.phase == "analyzed" and not force:
+            console.print(f"[yellow]⚠[/yellow] Run already analyzed. Use --force to re-analyze.")
+            results_file = context.data_dir / "results.json"
+            if results_file.exists():
+                console.print(f"[dim]Results available at: {results_file}[/dim]")
+            return
+        
+        show_logo()
+        console.print(f"[bold blue]Analyzing Use Case Implementations[/bold blue]")
+        console.print(f"Repository: [cyan]{context.config.repo_url}[/cyan]")
+        console.print(f"Run ID: [dim]{run_id}[/dim]")
+        console.print()
+        
+        # Create analyzer
+        analyzer = ClaudeAnalyzer()
+        
+        if use_case:
+            console.print(f"[yellow]Analyzing use case {use_case} only...[/yellow]")
+            # TODO: Implement single use case analysis
+            console.print("[red]Single use case analysis not yet implemented.[/red]")
+            sys.exit(1)
+        else:
+            console.print("[yellow]Analyzing all use cases...[/yellow]")
+            
+            async def run_analysis():
+                try:
+                    result = await analyzer.analyze_run(run_id)
+                    return result
+                except Exception as e:
+                    console.print(f"[bold red]✗[/bold red] Analysis failed: {e}")
+                    sys.exit(1)
+            
+            # Run analysis
+            result = asyncio.run(run_analysis())
+            
+            console.print()
+            console.print("[bold green]✓[/bold green] Analysis completed successfully!")
+            
+            # Show summary
+            summary = result["overall_summary"]
+            console.print(f"[bold]Results Summary:[/bold]")
+            console.print(f"Status: [{'green' if summary['pass_fail_status'] == 'PASS' else 'red'}]{summary['pass_fail_status']}[/{'green' if summary['pass_fail_status'] == 'PASS' else 'red'}]")
+            console.print(f"Success Rate: [cyan]{summary['successful_cases']}/{summary['total_use_cases']} ({summary['success_rate']:.1%})[/cyan]")
+            
+            if result["common_failures"]:
+                console.print(f"[bold]Common Failure Patterns:[/bold]")
+                for failure in result["common_failures"][:3]:  # Show top 3
+                    console.print(f"• [red]{failure['pattern']}[/red] ({failure['frequency']} cases)")
+            
+            # Show file locations
+            console.print()
+            console.print(f"[bold]Output Files:[/bold]")
+            console.print(f"• Structured results: [cyan]{context.data_dir / 'results.json'}[/cyan]")
+            
+            if context.status.phase != "analyzed":
+                context.mark_analysis_completed()
+                console.print(f"• Run status updated to: [green]analyzed[/green]")
+    
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Analysis interrupted by user.[/yellow]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[bold red]✗[/bold red] Failed to analyze run: {e}")
         sys.exit(1)
 
 
