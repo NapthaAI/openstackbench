@@ -21,14 +21,34 @@ Open source local deployment tool for benchmarking coding agents (especially Cur
 - 🎯 **Real insights**: Discover obvious failures and improvement opportunities
 - 🌍 **Community-driven**: Expandable benchmark library
 
+## Prerequisites
+
+### System Requirements
+- **Python 3.10+**
+- **Node.js 18+** (for Claude Code CLI)
+- **Git** (for repository operations)
+
+### API Keys Required
+- **OpenAI API Key** - For DSPy-powered use case extraction
+- **Anthropic API Key** - For Claude Code analysis
+
+### Installation Dependencies
+
+1. **Install uv** (Python package manager):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+2. **Install Claude Code CLI** (required for analysis):
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
 ## Quick Start
 
 ### Installation
 
 ```bash
-# Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
 # Clone and install StackBench
 git clone https://github.com/your-org/stackbench
 cd stackbench
@@ -36,15 +56,29 @@ uv sync
 
 # Configure environment variables
 cp .env.sample .env
-# Edit .env and add your OpenAI API key
+# Edit .env and add your API keys:
+# - OPENAI_API_KEY=your_openai_key_here
+# - ANTHROPIC_API_KEY=your_anthropic_key_here
 ```
 
 ### Basic Usage
 
+**Complete Workflow:**
 ```bash
-# Clone a repository for benchmarking
+# 1. Clone repository and extract use cases
 stackbench clone https://github.com/user/awesome-lib
+stackbench extract <run-id>
 
+# 2. Execute use cases (manual with Cursor)
+stackbench print-prompt <run-id> -u 1 --copy
+# [Implement in Cursor IDE]
+
+# 3. Analyze results
+stackbench analyze <run-id>
+```
+
+**Repository Setup Options:**
+```bash
 # Focus on specific folders  
 stackbench clone https://github.com/user/awesome-lib -i docs,examples
 
@@ -60,15 +94,22 @@ stackbench clone https://github.com/user/awesome-lib -b develop -i docs,tutorial
 Clone a repository and set up a new benchmark run.
 
 ```bash
-# Basic clone
+# Clone repository with all documentation
 stackbench clone https://github.com/user/awesome-lib
 
-# Include specific folders only
+# Focus on specific folders only
 stackbench clone https://github.com/user/awesome-lib -i docs,examples
 
-# Clone specific branch
+# Clone specific branch  
 stackbench clone https://github.com/user/awesome-lib -b develop
 ```
+
+This command:
+- Creates a unique run ID and directory structure
+- Clones the repository to `./data/<uuid>/repo/`
+- Only keeps documentation and config files (`.md`, `.mdx`, `.toml`, `.json`, `.yaml`)
+- Sets up run tracking with persistent state
+- Returns the run ID for subsequent commands
 
 **`stackbench list`**
 List all benchmark runs with their status.
@@ -130,12 +171,17 @@ This command:
 - Shows target directory and next steps
 - Currently supports Cursor IDE agent
 
+### Use Case Analysis
+
 **`stackbench analyze <run-id>`**
 Analyze use case implementations using Claude Code.
 
 ```bash
-# Analyze all use cases in a run
+# Analyze all use cases in a run (default: 3 parallel workers)
 stackbench analyze 4a72004a-592b-49b7-9920-08cf54485f85
+
+# Analyze with custom number of parallel workers
+stackbench analyze <run-id> --workers 5
 
 # Analyze specific use case only
 stackbench analyze <run-id> --use-case 2
@@ -147,6 +193,8 @@ stackbench analyze <run-id> --force
 This command:
 - **Requires Claude Code CLI**: Install with `npm install -g @anthropic-ai/claude-code`
 - **Requires ANTHROPIC_API_KEY**: Set in your environment or .env file
+- **Parallel Processing**: Runs 3 use cases concurrently by default (configurable with `--workers`)
+- **Resume Capability**: Automatically resumes from where it left off if interrupted
 - Tests code executability by running implementation files
 - Analyzes library usage patterns (real vs mocked implementations)
 - Evaluates documentation consultation from code comments
@@ -220,7 +268,12 @@ StackBench uses Pydantic for configuration management with environment variable 
    OPENAI_API_KEY=your_openai_api_key_here
    ```
 
-3. **Customize other settings** as needed:
+3. **Add your Anthropic API key** (required for analysis):
+   ```bash
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   ```
+
+4. **Customize other settings** as needed:
    ```bash
    # Core settings
    DATA_DIR=./custom-data
@@ -230,6 +283,10 @@ StackBench uses Pydantic for configuration management with environment variable 
    # DSPy settings
    DSPY_MODEL=gpt-4o-mini
    DSPY_MAX_TOKENS=10000
+   
+   # Analysis settings
+   ANALYSIS_MAX_WORKERS=3
+   CLAUDE_MODEL=claude-sonnet-4
    
    # Logging
    LOG_LEVEL=DEBUG
