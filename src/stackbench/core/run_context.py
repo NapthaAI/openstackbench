@@ -248,20 +248,27 @@ class RunStatus(BaseModel):
         return ready_count > 0 and self.analyzed_count == ready_count
     
     def update_phase_automatically(self) -> RunPhase:
-        """Update phase based on current state and return new phase."""
+        """Update phase based on current state and return new phase.
+        
+        Phases represent completed work:
+        - CLONED: cloning completed
+        - EXTRACTED: extraction completed  
+        - EXECUTION: execution completed
+        - ANALYSIS_INDIVIDUAL: individual analysis completed
+        - ANALYSIS_OVERALL: overall analysis completed
+        - COMPLETED: everything done
+        """
         if self.phase == RunPhase.CREATED and self.clone_completed:
             self.update_phase(RunPhase.CLONED)
         elif self.phase == RunPhase.CLONED and self.extraction_completed:
             self.update_phase(RunPhase.EXTRACTED)
-        elif self.phase == RunPhase.EXTRACTED and self._is_ready_for_execution_phase():
+        elif self.phase == RunPhase.EXTRACTED and self.execution_phase_completed:
             self.update_phase(RunPhase.EXECUTION)
-        elif self.phase == RunPhase.EXECUTION and self._can_complete_execution_phase():
-            self.execution_phase_completed = True
+        elif self.phase == RunPhase.EXECUTION and self.individual_analysis_completed:
             self.update_phase(RunPhase.ANALYSIS_INDIVIDUAL)
-        elif self.phase == RunPhase.ANALYSIS_INDIVIDUAL and self._can_complete_individual_analysis():
-            self.individual_analysis_completed = True
+        elif self.phase == RunPhase.ANALYSIS_INDIVIDUAL and self.overall_analysis_completed:
             self.update_phase(RunPhase.ANALYSIS_OVERALL)
-        elif self.phase == RunPhase.ANALYSIS_OVERALL and self.overall_analysis_completed:
+        elif self.phase == RunPhase.ANALYSIS_OVERALL:
             self.update_phase(RunPhase.COMPLETED)
         
         return self.phase
@@ -395,6 +402,9 @@ class RunContext(BaseModel):
     def mark_individual_analysis_completed(self) -> None:
         """Mark individual analysis phase as completed."""
         self.status.individual_analysis_completed = True
+        # Ensure execution phase is also marked as completed since we can't analyze without execution
+        if not self.status.execution_phase_completed:
+            self.status.execution_phase_completed = True
         self.status.update_phase_automatically()
         self.save()
     
@@ -439,8 +449,12 @@ class RunContext(BaseModel):
                 uc.executed_at = datetime.now()
                 newly_detected.append(use_case_num)
         
-        # Update phase if we detected new implementations
+        # Update execution phase completion status and phase if we detected new implementations
         if newly_detected:
+            # Check if execution phase should be marked as completed
+            if self.status._can_complete_execution_phase():
+                self.status.execution_phase_completed = True
+            
             self.status.update_phase_automatically()
             self.save()
         

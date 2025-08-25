@@ -348,7 +348,9 @@ Save your analysis as a JSON file with this structure:
             raise ValueError(f"Could not load run context: {e}")
         
         # Validate run phase
-        if context.status.phase not in ["extracted", "executed", "analyzed"]:
+        from ..core.run_context import RunPhase
+        valid_phases = [RunPhase.EXTRACTED, RunPhase.EXECUTION, RunPhase.ANALYSIS_INDIVIDUAL, RunPhase.ANALYSIS_OVERALL, RunPhase.COMPLETED]
+        if context.status.phase not in valid_phases:
             raise ValueError(f"Run must be extracted first, currently: {context.status.phase}")
         
         # Load use cases
@@ -448,7 +450,9 @@ Save your analysis as a JSON file with this structure:
             raise ValueError(f"Could not load run context: {e}")
         
         # Validate run phase
-        if context.status.phase not in ["extracted", "executed", "analyzed"]:
+        from ..core.run_context import RunPhase
+        valid_phases = [RunPhase.EXTRACTED, RunPhase.EXECUTION, RunPhase.ANALYSIS_INDIVIDUAL, RunPhase.ANALYSIS_OVERALL, RunPhase.COMPLETED]
+        if context.status.phase not in valid_phases:
             raise ValueError(f"Run must be extracted first, currently: {context.status.phase}")
         
         # Load use cases

@@ -207,31 +207,54 @@ def list_runs():
             phase_str = phase.value if hasattr(phase, 'value') else str(phase)
             phase_colored = f"[{get_phase_color(phase)}]{phase_str}[/{get_phase_color(phase)}]"
             
-            # Status column - show simple, clear progress information
+            # Status column - show progress within current phase or what's needed next
             status_parts = []
             
             # Show errors if any
             if summary["has_errors"]:
                 status_parts.append("[red]⚠ errors[/red]")
             
-            # Show execution progress for runs with use cases
-            if summary["total_use_cases"] > 0:
-                executed = summary["executed_use_cases"]
-                total = summary["total_use_cases"]
-                
-                if executed > 0:
-                    status_parts.append(f"[cyan]{executed}/{total} executed[/cyan]")
-                elif context.status.phase.value in ["execution", "analysis_individual", "analysis_overall"]:
-                    status_parts.append("[yellow]pending execution[/yellow]")
-            else:
-                # No use cases yet - show what's needed next
-                phase_val = context.status.phase.value
-                if phase_val == "extracted":
+            phase_val = context.status.phase.value
+            total = summary["total_use_cases"]
+            executed = summary["executed_use_cases"] 
+            analyzed = context.status.analyzed_count
+            
+            # Determine status based on current phase and progress
+            if phase_val == "created":
+                status_parts.append("[dim]ready for clone[/dim]")
+            elif phase_val == "cloned":
+                status_parts.append("[blue]ready for extraction[/blue]")
+            elif phase_val == "extracted":
+                # Extraction completed - show execution progress or readiness
+                if total > 0:
+                    if executed == 0:
+                        status_parts.append("[yellow]ready for execution[/yellow]")
+                    elif executed < total:
+                        status_parts.append(f"[cyan]{executed}/{total} executed[/cyan]")
+                    else:
+                        # This shouldn't happen in this phase, but handle gracefully
+                        status_parts.append("[green]execution complete[/green]")
+                else:
                     status_parts.append("[yellow]ready for execution[/yellow]")
-                elif phase_val == "cloned":
-                    status_parts.append("[blue]ready for extraction[/blue]")
-                elif phase_val == "created":
-                    status_parts.append("[dim]ready for clone[/dim]")
+            elif phase_val == "execution":
+                # Execution completed - show analysis progress or readiness
+                if total > 0:
+                    if analyzed == 0:
+                        status_parts.append("[yellow]ready for analysis[/yellow]")
+                    elif analyzed < executed:  # Only analyze executed use cases
+                        status_parts.append(f"[magenta]{analyzed}/{executed} analyzed[/magenta]")
+                    else:
+                        status_parts.append("[green]analysis complete[/green]")
+                else:
+                    status_parts.append("[yellow]ready for analysis[/yellow]")
+            elif phase_val == "analysis_individual":
+                # Individual analysis completed - show overall analysis readiness
+                status_parts.append("[yellow]ready for overall analysis[/yellow]")
+            elif phase_val == "analysis_overall":
+                # Overall analysis completed
+                status_parts.append("[green]overall analysis complete[/green]")
+            elif phase_val == "completed":
+                status_parts.append("[green]completed[/green]")
             
             status = " | ".join(status_parts) if status_parts else "[dim]—[/dim]"
             
@@ -479,12 +502,17 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
             console.print("[dim]Use 'stackbench list' to see available runs.[/dim]")
             sys.exit(1)
         
-        # Validate run phase
+        # Validate run phase for individual analysis
+        # EXTRACTED: extraction complete, may have some executions to analyze
+        # EXECUTION: execution complete, ready for individual analysis  
+        # ANALYSIS_INDIVIDUAL: individual analysis complete, can do overall analysis
         valid_phases = [RunPhase.EXTRACTED, RunPhase.EXECUTION, RunPhase.ANALYSIS_INDIVIDUAL, RunPhase.ANALYSIS_OVERALL, RunPhase.COMPLETED]
         if context.status.phase not in valid_phases and not force:
             console.print(f"[bold red]✗[/bold red] Run must be extracted first, currently: {context.status.phase}")
             if context.status.phase == RunPhase.CLONED:
                 console.print("[dim]Use 'stackbench extract <run-id>' first to generate use cases.[/dim]")
+            elif context.status.phase == RunPhase.CREATED:
+                console.print("[dim]Use 'stackbench clone <repo-url>' first to clone the repository.[/dim]")
             sys.exit(1)
         
         # For manual agents, detect any new implementations
@@ -493,10 +521,52 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
             if newly_detected:
                 console.print(f"[green]Detected {len(newly_detected)} new implementations: {newly_detected}[/green]")
         
-        # Check if already analyzed and not forcing
-        if context.status.individual_analysis_completed and not force:
-            console.print(f"[yellow]⚠[/yellow] Individual analysis already completed. Use --force to re-analyze.")
+        # Check if individual analysis is already completed and handle accordingly
+        if context.status.phase in [RunPhase.ANALYSIS_INDIVIDUAL, RunPhase.ANALYSIS_OVERALL, RunPhase.COMPLETED] and not force:
+            console.print(f"[yellow]⚠[/yellow] Individual analysis already completed (phase: {context.status.phase}). Use --force to re-analyze.")
+            
+            # If already at ANALYSIS_INDIVIDUAL but user wants to run overall analysis
+            if context.status.phase == RunPhase.ANALYSIS_INDIVIDUAL and not skip_overall:
+                console.print("[bold blue]Individual analysis completed, proceeding to overall analysis...[/bold blue]")
+                
+                try:
+                    # Create overall analyzer  
+                    overall_analyzer = OverallAnalyzer(verbose=verbose)
+                    
+                    with console.status("[bold green]Generating results.json and results.md..."):
+                        async def run_overall_analysis():
+                            try:
+                                result_paths = await overall_analyzer.analyze_run(run_id)
+                                return result_paths
+                            except Exception as e:
+                                console.print(f"[bold red]✗[/bold red] Overall analysis failed: {e}")
+                                return None
+                        
+                        # Run overall analysis
+                        import asyncio
+                        result_paths = asyncio.run(run_overall_analysis())
+                        
+                        if result_paths:
+                            console.print("[bold green]✓[/bold green] Overall analysis completed successfully!")
+                            console.print()
+                            console.print("[bold]Generated Files:[/bold]")
+                            console.print(f"• [cyan]results.json[/cyan]: {result_paths['results_json']}")
+                            console.print(f"• [cyan]results.md[/cyan]: {result_paths['results_markdown']}")
+                except Exception as e:
+                    console.print(f"[bold red]✗[/bold red] Failed to run overall analysis: {e}")
+            
             return
+        
+        # Check if there are any implementations to analyze
+        if context.status.phase == RunPhase.EXTRACTED:
+            # For EXTRACTED phase, we need implementations before we can analyze
+            if context.status.executed_count == 0:
+                console.print(f"[yellow]⚠[/yellow] No implementations found to analyze.")
+                if context.is_manual_agent():
+                    console.print("[dim]Create implementations first using 'stackbench print-prompt <run-id> --use-case <n>'[/dim]")
+                else:
+                    console.print("[dim]Execute use cases first before analysis.[/dim]")
+                return
         
         show_logo()
         console.print(f"[bold blue]Analyzing Use Case Implementations[/bold blue]")
@@ -612,10 +682,11 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
                 
                 console.print(f"• [{status_color}]{status_text}[/{status_color}] Use Case {use_case_num}: {use_case_name} - [{status_color}]{exec_text}[/{status_color}]")
             
-            # Mark individual analysis as completed
+            # Mark individual analysis as completed - this will update the phase to ANALYSIS_INDIVIDUAL
             if not context.status.individual_analysis_completed:
                 context.mark_individual_analysis_completed()
                 console.print(f"• Individual analysis status updated to: [green]completed[/green]")
+                console.print(f"• Phase updated to: [green]{context.status.phase}[/green]")
             
             # Run overall analysis if not skipped and individual analysis is complete
             if not skip_overall and not use_case:  # Only run overall analysis for full runs, not single use case

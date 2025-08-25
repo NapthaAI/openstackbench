@@ -130,14 +130,28 @@ class OverallAnalyzer:
             async with ClaudeSDKClient(options=options) as client:
                 await client.query(prompt)
                 
-                # Process the response
+                # Process the response and save messages for debugging
                 messages = []
                 async for message in client.receive_response():
                     messages.append(message)
                     if self.verbose:
                         print(f"[OverallAnalyzer] Received response message")
                 
-                # Check if results.md was created
+                # Save analysis messages for debugging
+                try:
+                    from .individual_analyzer import IndividualAnalyzer
+                    analyzer = IndividualAnalyzer()
+                    messages_dict = analyzer.messages_to_dict(messages)
+                    analysis_messages_path = logs_dir / "overall_analysis_messages.json"
+                    import json
+                    with open(analysis_messages_path, 'w') as f:
+                        json.dump(messages_dict, f, indent=2, default=str)
+                    if self.verbose:
+                        print(f"[OverallAnalyzer] Saved analysis messages to: {analysis_messages_path}")
+                except Exception as e:
+                    print(f"[OverallAnalyzer] Warning: Could not save analysis messages: {e}")
+                
+                # Check if results.md was created (should be moved by hook)
                 results_md_path = results_dir / "results.md"
                 if results_md_path.exists():
                     with open(results_md_path, 'r') as f:
@@ -332,13 +346,13 @@ Create a comprehensive analysis report as `results.md` following this structure:
 ```
 
 **Important Requirements:**
-1. Save the analysis report to `results.md` in the current directory
+1. Save the analysis report to `results.md` in the run directory: {str(context.run_dir / "results.md")}
 2. Focus on actionable insights that would help library maintainers improve AI agent compatibility
 3. Use specific examples from the results data to support your analysis
 4. Keep the tone professional and constructive
 5. Highlight both successes and failures to provide balanced feedback
 
-Generate the analysis report now by creating the `results.md` file.
+Generate the analysis report now by creating the `results.md` file at the specified path.
 """
         
         return prompt
