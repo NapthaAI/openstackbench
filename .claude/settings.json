@@ -1,0 +1,35 @@
+{
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "*",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "CLAUDE_HOOK_TYPE=PreToolUse python3 $CLAUDE_PROJECT_DIR/.claude/hooks/tool_logger.py"
+            }
+          ]
+        }
+      ],
+      "PostToolUse": [
+        {
+          "matcher": "*",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "CLAUDE_HOOK_TYPE=PostToolUse python3 $CLAUDE_PROJECT_DIR/.claude/hooks/tool_logger.py"
+            }
+          ]
+        },
+        {
+          "matcher": "Write|Edit",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/analyst_json_validator.py"
+            }
+          ]
+        }
+      ]
+    }
+  }
