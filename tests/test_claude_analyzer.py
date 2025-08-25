@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch, AsyncMock, MagicMock
 
 import pytest
 
-from stackbench.analyzers.claude_analyzer import ClaudeAnalyzer
+from stackbench.analyzers.individual_analyzer import IndividualAnalyzer
 from stackbench.analyzers.models import UseCaseAnalysisResult
 from stackbench.core.run_context import RunContext, ExecutionMethod, ExecutionStatus
 from stackbench.extractors.models import UseCase
@@ -101,36 +101,36 @@ def mock_analysis_result():
     }
 
 
-class TestClaudeAnalyzer:
+class TestIndividualAnalyzer:
     """Test Claude analyzer initialization and basic functionality."""
     
     def test_analyzer_init_default(self):
         """Test analyzer initialization with defaults."""
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         assert analyzer.verbose is False
         assert hasattr(analyzer, 'config')
     
     def test_analyzer_init_verbose(self):
         """Test analyzer initialization with verbose mode.""" 
-        analyzer = ClaudeAnalyzer(verbose=True)
+        analyzer = IndividualAnalyzer(verbose=True)
         assert analyzer.verbose is True
     
     def test_analyzer_init_with_config(self):
         """Test analyzer initialization with custom config."""
         custom_config = {"analysis_max_turns": 20}
-        analyzer = ClaudeAnalyzer(config=custom_config, verbose=True)
+        analyzer = IndividualAnalyzer(config=custom_config, verbose=True)
         assert analyzer.verbose is True
         assert hasattr(analyzer, 'config')
     
     def test_messages_to_dict_empty(self):
         """Test message conversion with empty list."""
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         result = analyzer.messages_to_dict([])
         assert result == []
     
     def test_messages_to_dict_with_mock_messages(self):
         """Test message conversion with mock messages."""
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         
         # Create mock messages
         mock_msg1 = Mock()
@@ -163,7 +163,7 @@ class TestSingleUseCaseAnalysis:
         mock_load_context.return_value = prepared_context_with_implementations  
         mock_load_use_cases.return_value = mock_use_cases  # 3 use cases
         
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         
         import asyncio
         with pytest.raises(ValueError, match="Use case 999 not found"):
@@ -172,7 +172,7 @@ class TestSingleUseCaseAnalysis:
     
     def test_create_analysis_prompt(self, prepared_context_with_implementations, mock_use_cases):
         """Test creating analysis prompt."""
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         use_case = mock_use_cases[0]
         target_file = prepared_context_with_implementations.data_dir / "use_case_1" / "solution.py"
         
@@ -205,7 +205,7 @@ class TestLoadUseCases:
         
         mock_load_context.return_value = context
         
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         
         import asyncio
         with pytest.raises(ValueError, match="Run must be extracted first"):
@@ -222,7 +222,7 @@ class TestLoadUseCases:
         
         mock_load_context.return_value = context
         
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         
         import asyncio
         with pytest.raises(ValueError, match="Run must be extracted first"):
@@ -230,7 +230,7 @@ class TestLoadUseCases:
     
     def test_analyze_run_load_context_failure(self):
         """Test analyze_run when context loading fails."""
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         
         import asyncio
         with pytest.raises(ValueError, match="Could not load run context"):
@@ -238,7 +238,7 @@ class TestLoadUseCases:
     
     def test_analyze_single_use_case_load_context_failure(self):
         """Test analyze_single_use_case when context loading fails."""
-        analyzer = ClaudeAnalyzer()
+        analyzer = IndividualAnalyzer()
         
         import asyncio
         with pytest.raises(ValueError, match="Could not load run context"):
