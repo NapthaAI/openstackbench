@@ -70,7 +70,7 @@ def format_datetime(dt_str: str) -> str:
         return dt_str
 
 
-def show_help_with_logo(ctx, param, value):
+def show_help_with_logo(ctx, _, value):
     """Custom help callback that shows logo."""
     if not value or ctx.resilient_parsing:
         return

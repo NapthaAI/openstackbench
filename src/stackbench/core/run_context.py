@@ -239,9 +239,8 @@ class RunStatus(BaseModel):
     
     def _can_complete_execution_phase(self) -> bool:
         """Check if execution phase can be marked as complete."""
-        # For CLI agents: all use cases executed
-        # For IDE agents: manually marked complete or all detected as implemented
-        return self.executed_count == self.total_use_cases or self.execution_phase_completed
+        # Execution phase is complete when all use cases have been executed
+        return self.executed_count == self.total_use_cases
     
     def _can_complete_individual_analysis(self) -> bool:
         """Check if individual analysis phase can be marked as complete."""
