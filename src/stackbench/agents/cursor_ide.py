@@ -74,6 +74,19 @@ Please implement the use case described above.
 
 **Target Directory:** Create the directory `{relative_target_dir}` if it doesn't exist. All files that you decide to create should be placed in this directory.
 
+**Documentation Tracking:** At the top of your solution file, include a comment block documenting which files you consulted:
+```python
+# DOCUMENTATION CONSULTED:
+# - README.md: Overview of library structure and basic usage
+# - docs/api/models.md: Model definitions and schema
+# - examples/quickstart.py: Basic implementation patterns
+# 
+# IMPLEMENTATION NOTES:
+# - Used real library imports and methods
+# - Applied patterns from quickstart example
+# - Handled edge cases based on API documentation
+```
+
 **Environment Setup:** Check for and load any environment file at `{context.config.env_file_path}` (relative to your current working directory) if it exists. This may contain important configuration variables, API keys, or settings needed for the library to work properly.
 
 ### Implementation Requirements:
