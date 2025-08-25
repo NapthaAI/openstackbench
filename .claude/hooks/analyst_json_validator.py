@@ -145,6 +145,27 @@ def validate_stackbench_json_structure(data, filename):
     
     return len(errors) == 0, errors
 
+def validate_file_location(file_path):
+    """Validate that the analysis file is being saved in the correct location."""
+    expected_dir = os.environ.get('CLAUDE_OUTPUT_DIR', '')
+    if not expected_dir:
+        print("⚠️ No CLAUDE_OUTPUT_DIR set, cannot validate file location", file=sys.stderr)
+        return True
+    
+    file_dir = os.path.dirname(os.path.abspath(file_path))
+    expected_dir = os.path.abspath(expected_dir)
+    
+    if file_dir != expected_dir:
+        print(f"❌ WRONG LOCATION: File being saved in wrong directory!", file=sys.stderr)
+        print(f"   Expected: {expected_dir}", file=sys.stderr)
+        print(f"   Actual:   {file_dir}", file=sys.stderr)
+        print(f"💡 Use absolute path: {expected_dir}/{os.path.basename(file_path)}", file=sys.stderr)
+        return False
+    else:
+        print(f"✅ CORRECT LOCATION: File being saved in expected directory", file=sys.stderr)
+        print(f"   Directory: {file_dir}", file=sys.stderr)
+        return True
+
 def main():
     try:
         print("🔧 STACKBENCH JSON VALIDATOR: Starting validation", file=sys.stderr)
@@ -161,6 +182,11 @@ def main():
         if not (filename.endswith('.json') and ('analysis' in filename.lower() or 'use_case_' in filename.lower())):
             print("⏭️ Not a StackBench analysis file, skipping validation.", file=sys.stderr)
             sys.exit(0)
+        
+        # Validate file location first
+        if not validate_file_location(file_path):
+            print("❌ File location validation failed. Fix the path and try again.", file=sys.stderr)
+            sys.exit(1)
         
         if not tool_data.get('tool_response', {}).get('success', False):
             print("⚠️ Write marked as failed, but checking if file exists anyway.", file=sys.stderr)
