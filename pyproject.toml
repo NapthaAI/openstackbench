@@ -24,6 +24,7 @@ dependencies = [
     "gitpython>=3.1.0",
     "pytest>=8.4.1",
     "pyperclip>=1.8.0",
+    "claude-code-sdk>=0.0.20",
 ]
 
 [project.optional-dependencies]
