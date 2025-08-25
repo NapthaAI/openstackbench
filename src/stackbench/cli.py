@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
-
+import uuid
 import click
 from rich.console import Console
 from rich.table import Table
@@ -159,8 +159,6 @@ def list_runs():
                 len(item.name) == 36 and  # UUID length
                 (item / "run_context.json").exists()):
                 try:
-                    # Validate it's a UUID by trying to parse it
-                    import uuid
                     uuid.UUID(item.name)
                     run_ids.append(item.name)
                 except ValueError:
@@ -207,7 +205,7 @@ def list_runs():
             phase_str = phase.value if hasattr(phase, 'value') else str(phase)
             phase_colored = f"[{get_phase_color(phase)}]{phase_str}[/{get_phase_color(phase)}]"
             
-            # Status column - show meaningful progress information
+            # Status column - show simple, clear progress information
             status_parts = []
             
             # Show errors if any
@@ -219,23 +217,18 @@ def list_runs():
                 executed = summary["executed_use_cases"]
                 total = summary["total_use_cases"]
                 
-                # Show execution progress
                 if executed > 0:
                     status_parts.append(f"[cyan]{executed}/{total} executed[/cyan]")
-                
-                # Show success rate if we have completed executions
-                success_rate = summary["success_rate"]
-                if success_rate > 0:
-                    status_parts.append(f"[green]{success_rate:.0%} success[/green]")
-                elif executed == 0 and context.status.phase.value in ["execution", "analysis_individual", "analysis_overall"]:
+                elif context.status.phase.value in ["execution", "analysis_individual", "analysis_overall"]:
                     status_parts.append("[yellow]pending execution[/yellow]")
             else:
-                # No use cases yet
-                if context.status.phase.value == "extracted":
+                # No use cases yet - show what's needed next
+                phase_val = context.status.phase.value
+                if phase_val == "extracted":
                     status_parts.append("[yellow]ready for execution[/yellow]")
-                elif context.status.phase.value == "cloned":
+                elif phase_val == "cloned":
                     status_parts.append("[blue]ready for extraction[/blue]")
-                elif context.status.phase.value == "created":
+                elif phase_val == "created":
                     status_parts.append("[dim]ready for clone[/dim]")
             
             status = " | ".join(status_parts) if status_parts else "[dim]—[/dim]"
