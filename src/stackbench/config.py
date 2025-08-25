@@ -31,7 +31,7 @@ class Config(BaseSettings):
     # Claude Code analysis settings
     anthropic_api_key: Optional[str] = None
     claude_model: str = "claude-sonnet-4"
-    analysis_max_turns: int = 30
+    analysis_max_turns: int = 50
     analysis_max_workers: int = 3
     
     # Logging

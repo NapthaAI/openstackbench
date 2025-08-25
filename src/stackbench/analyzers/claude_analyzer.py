@@ -8,33 +8,77 @@ from typing import Dict, List, Optional
 
 from claude_code_sdk import ClaudeSDKClient, ClaudeCodeOptions
 
-from ..config import get_config
+from ..config import get_config, find_env_file
 from ..core.run_context import RunContext
 from ..extractors.models import UseCase
 from ..extractors.extractor import load_use_cases
-from .models import (
-    CodeExecutabilityResult,
-    UnderlyingLibraryUsage, 
-    MockingAnalysis,
-    MockingDecisionTrace,
-    QualityAssessment,
-    ImprovementRecommendation,
-    OverallSummary,
-    CommonFailurePattern,
-    FrameworkInsight
-)
-
 
 class ClaudeAnalyzer:
     """Claude Code-powered analyzer for use case implementations."""
     
-    def __init__(self, config: Optional[Dict] = None):
+    def __init__(self, config: Optional[Dict] = None, verbose: bool = False):
         self.config = get_config()
+        self.verbose = verbose
         if config:
             # Override config values if provided
             for key, value in config.items():
                 if hasattr(self.config, key):
                     setattr(self.config, key, value)
+    
+    def messages_to_dict(self, messages) -> List[Dict]:
+        """Convert Claude Code messages to dictionary format for JSON serialization."""
+        from dataclasses import asdict
+        
+        result = []
+        for i, msg in enumerate(messages):
+            try:
+                # Use dataclass conversion if available
+                if hasattr(msg, '__dataclass_fields__'):
+                    msg_dict = asdict(msg)
+                else:
+                    # Fallback to manual conversion
+                    msg_dict = {}
+                    for attr in dir(msg):
+                        if not attr.startswith('_') and not callable(getattr(msg, attr)):
+                            try:
+                                value = getattr(msg, attr)
+                                # Convert non-serializable objects to strings
+                                if isinstance(value, (str, int, float, bool, type(None))):
+                                    msg_dict[attr] = value
+                                elif isinstance(value, (list, dict)):
+                                    msg_dict[attr] = value
+                                else:
+                                    msg_dict[attr] = str(value)
+                            except Exception:
+                                continue
+                
+                # Determine role based on message type
+                msg_type = type(msg).__name__
+                if 'SystemMessage' in msg_type:
+                    msg_dict['role'] = 'system'
+                elif 'AssistantMessage' in msg_type:
+                    msg_dict['role'] = 'assistant'
+                elif 'UserMessage' in msg_type:
+                    msg_dict['role'] = 'user'
+                else:
+                    msg_dict['role'] = 'unknown'
+                
+                # Add message index and type info
+                msg_dict['message_index'] = i
+                msg_dict['message_type'] = msg_type
+                
+                result.append(msg_dict)
+                
+            except Exception as e:
+                # Fallback for messages that can't be serialized
+                result.append({
+                    "message_index": i,
+                    "role": "error",
+                    "message_type": str(type(msg)),
+                    "error": f"Could not serialize message: {str(e)}",
+                })
+        
+        return result
     
     def create_analysis_prompt(
         self, 
@@ -55,6 +99,10 @@ class ClaudeAnalyzer:
             relative_target_file = target_file_path.relative_to(Path.cwd())
         except ValueError:
             relative_target_file = target_file_path
+        
+        # Get environment file path
+        env_file = find_env_file()
+        env_file_info = f"Environment file: `{env_file}`" if env_file else "No environment file found"
         
         prompt = f"""# StackBench Analysis: Use Case {use_case_number}
 
@@ -88,15 +136,18 @@ Analyze the implementation to assess documentation quality and provide structure
 ## Implementation to Analyze
 **Repository Path:** `{relative_repo_dir}`
 **Implementation File:** `{relative_target_file}`
+**{env_file_info}**
 
 ## Analysis Process
 
-### Step 1: Read Implementation
-Use the Read tool to examine the implementation file. Look for:
-- Documentation tracking comments at the top
-- Import statements and library usage
-- Implementation approach and patterns
-- Error handling and edge cases
+### Step 1: Read Main Implementation File ONLY
+**CRITICAL:** Focus ONLY on the main implementation file: `{relative_target_file}`
+- Do NOT read or analyze other files in the repository
+- Do NOT explore the codebase beyond this single file
+- Look for documentation tracking comments at the top
+- Examine import statements and library usage
+- Review implementation approach and patterns
+- Check error handling and edge cases
 
 ### Step 2: Test Code Executability  
 **IMPORTANT:** Test the implementation by running it exactly as written. Do NOT modify the code.
@@ -104,18 +155,21 @@ Use the Read tool to examine the implementation file. Look for:
 - You may install dependencies if needed
 - Capture success output or error messages
 - Assess code quality and functionality
+- Focus ONLY on this single file's execution
 
-### Step 3: Analyze Library Usage
+### Step 3: Analyze Library Usage (Single File Only)
 Determine if the implementation uses:
 - Real library imports and methods
 - Mock/fake implementations
 - If mocked, try to understand why from the code comments and structure
+- Base analysis ONLY on what's visible in the main implementation file
 
-### Step 4: Documentation Analysis
+### Step 4: Documentation Analysis (Implementation File Only)
 Since IDE agents don't have tool usage logs, analyze documentation usage from:
 - "DOCUMENTATION CONSULTED" comments in the implementation
 - Quality of implementation patterns used
 - Evidence of following library conventions
+- Base conclusions ONLY on the main implementation file content
 
 ## Required JSON Output
 Save your analysis as a JSON file with this structure:
@@ -205,25 +259,102 @@ Save your analysis as a JSON file with this structure:
             target_file_path=target_file_path
         )
         
-        # Set up Claude Code client
+        # Set up environment variables for Claude Code hooks - use absolute paths
+        os.environ['CLAUDE_USE_CASE_ID'] = f"use_case_{use_case_number}"
+        os.environ['CLAUDE_OUTPUT_DIR'] = str(use_case_dir.absolute())
+        os.environ['CLAUDE_LOGS_DIR'] = str((context.data_dir / "logs").absolute())
+        os.environ['CLAUDE_PROJECT_DIR'] = str(Path.cwd().absolute())  # Use current working directory as project root
+        os.environ['CLAUDE_AGENT'] = 'stackbench_analyzer'
+        
+        # Ensure logs directory exists
+        logs_dir = Path(os.environ['CLAUDE_LOGS_DIR'])
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        print(f"[Worker] Environment setup for use case {use_case_number}:")
+        print(f"[Worker]   CLAUDE_USE_CASE_ID={os.environ['CLAUDE_USE_CASE_ID']}")
+        print(f"[Worker]   CLAUDE_OUTPUT_DIR={os.environ['CLAUDE_OUTPUT_DIR']}")
+        print(f"[Worker]   CLAUDE_LOGS_DIR={os.environ['CLAUDE_LOGS_DIR']}")
+        print(f"[Worker]   CLAUDE_PROJECT_DIR={os.environ['CLAUDE_PROJECT_DIR']}")
+        print(f"[Worker]   Logs directory exists: {logs_dir.exists()}")
+        
+        # Set up Claude Code client - run from StackBench project root so hooks are found
         options = ClaudeCodeOptions(
             system_prompt="You are a documentation analysis expert. Analyze implementations systematically and provide structured JSON output.",
             max_turns=self.config.analysis_max_turns,
-            cwd=str(context.repo_dir),  # Run analysis from repository directory
+            cwd=str(Path.cwd()),  # Run from StackBench project root where .claude directory is located
             allowed_tools=["Read", "Write", "Bash", "LS", "Grep"]
         )
         
+        messages = []
+        turn_count = 0
+        
         try:
+            print(f"[Worker] Starting analysis workflow for use case {use_case_number}")
+            print(f"[Worker] Use case: {use_case.name}")
+            print(f"[Worker] Output directory: {use_case_dir}")
+            
+            if self.verbose:
+                print(f"[Worker] === ANALYSIS PROMPT ===")
+                print(f"[Worker] Full prompt:\n{prompt}")
+                print(f"[Worker] === END ANALYSIS PROMPT ===")
+            else:
+                # Show a preview of the prompt
+                prompt_preview = prompt[:500] + "..." if len(prompt) > 500 else prompt
+                print(f"[Worker] Prompt preview: {prompt_preview}")
+            
             async with ClaudeSDKClient(options=options) as client:
                 await client.query(prompt)
                 
-                # Collect analysis result
+                # Collect and stream messages with turn tracking
                 analysis_text = []
                 async for message in client.receive_response():
+                    messages.append(message)
+                    turn_count += 1
+                    print(f"[Worker] Use case {use_case_number}: Analysis turn {turn_count} completed")
+                    
+                    if self.verbose:
+                        print(f"[Worker] Message: {message}")
+                    
                     if hasattr(message, 'content'):
                         for block in message.content:
                             if hasattr(block, 'text'):
                                 analysis_text.append(block.text)
+                                # Show text content snippets in verbose mode
+                                if self.verbose:
+                                    text_preview = block.text[:200] + "..." if len(block.text) > 200 else block.text
+                                    print(f"[Worker] Text content: {text_preview}")
+                                # Show partial progress for long analysis
+                                elif len(analysis_text) % 5 == 0:
+                                    print(f"[Worker] Use case {use_case_number}: Received {len(analysis_text)} response blocks...")
+                            elif hasattr(block, 'type') and block.type == 'tool_use':
+                                tool_name = getattr(block, 'name', 'unknown')
+                                print(f"[Worker] Use case {use_case_number}: 🔧 Executing {tool_name} tool")
+                                if self.verbose and hasattr(block, 'input'):
+                                    print(f"[Worker] Tool input: {block.input}")
+                            elif hasattr(block, 'type') and block.type == 'tool_result':
+                                print(f"[Worker] Use case {use_case_number}: ✅ Tool completed")
+                                if self.verbose and hasattr(block, 'content'):
+                                    result_preview = str(block.content)[:200] + "..." if len(str(block.content)) > 200 else str(block.content)
+                                    print(f"[Worker] Tool result: {result_preview}")
+                    elif hasattr(message, 'type'):
+                        # Handle other message types
+                        if message.type == 'tool_use':
+                            print(f"[Worker] Use case {use_case_number}: Tool execution in progress...")
+                        elif self.verbose:
+                            print(f"[Worker] Message type: {message.type}")
+                
+                print(f"[Worker] Use case {use_case_number}: Analysis completed after {turn_count} turns")
+                print(f"[Worker] Use case {use_case_number}: Collected {len(messages)} messages total")
+                
+                # Save analysis messages in the use case directory
+                try:
+                    messages_dict = self.messages_to_dict(messages)
+                    analysis_messages_path = use_case_dir / f"use_case_{use_case_number}_analysis_messages.json"
+                    with open(analysis_messages_path, 'w') as f:
+                        json.dump(messages_dict, f, indent=2, default=str)
+                    print(f"[Worker] Saved analysis messages to: {analysis_messages_path}")
+                except Exception as e:
+                    print(f"[Worker] Warning: Could not save analysis messages: {e}")
                 
                 # Try to read the generated analysis file
                 analysis_file = use_case_dir / f"use_case_{use_case_number}_analysis.json"
@@ -273,7 +404,7 @@ Save your analysis as a JSON file with this structure:
         
         # Load use cases
         try:
-            use_cases = load_use_cases(context.get_use_cases_file())
+            use_cases = load_use_cases(context)
         except Exception as e:
             raise ValueError(f"Could not load use cases: {e}")
         
@@ -319,6 +450,7 @@ Save your analysis as a JSON file with this structure:
                     context=context
                 )
                 print(f"[Worker] Completed use case {use_case_number}: {result.get('use_case_name', 'Unknown')}")
+                
                 return result
         
         # Execute all pending analyses concurrently
@@ -364,6 +496,7 @@ Save your analysis as a JSON file with this structure:
                 failed_cases += 1
         
         # Calculate overall summary
+        from .models import OverallSummary, CommonFailurePattern
         total_cases = len(use_cases)
         success_rate = (successful_cases / total_cases) if total_cases > 0 else 0.0
         pass_fail_status = "PASS" if success_rate >= 0.5 else "FAIL"
@@ -425,3 +558,42 @@ Save your analysis as a JSON file with this structure:
         context.mark_analysis_completed()
         
         return analysis_result
+    
+    async def analyze_single_use_case(self, run_id: str, use_case_number: int) -> Dict:
+        """Analyze a single specific use case."""
+        
+        try:
+            context = RunContext.load(run_id)
+        except Exception as e:
+            raise ValueError(f"Could not load run context: {e}")
+        
+        # Validate run phase
+        if context.status.phase not in ["extracted", "executed", "analyzed"]:
+            raise ValueError(f"Run must be extracted first, currently: {context.status.phase}")
+        
+        # Load use cases
+        try:
+            use_cases = load_use_cases(context)
+        except Exception as e:
+            raise ValueError(f"Could not load use cases: {e}")
+        
+        # Validate use case number
+        if use_case_number < 1 or use_case_number > len(use_cases):
+            raise ValueError(f"Use case {use_case_number} not found. Available: 1-{len(use_cases)}")
+        
+        # Get the specific use case (1-based index)
+        use_case = use_cases[use_case_number - 1]
+        
+        print(f"[Worker] Single use case analysis: {use_case_number}/{len(use_cases)}")
+        
+        # Analyze the single use case
+        result = await self.analyze_use_case(
+            run_id=run_id,
+            use_case_number=use_case_number,
+            use_case=use_case,
+            context=context
+        )
+        
+        print(f"[Worker] Single use case analysis completed: {result.get('use_case_name', 'Unknown')}")
+        
+        return result

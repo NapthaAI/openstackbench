@@ -388,15 +388,19 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str], copy: bool):
 @click.option("--use-case", "-u", type=int, help="Analyze specific use case only (1-based)")
 @click.option("--force", is_flag=True, help="Force re-analysis even if already completed")
 @click.option("--workers", "-w", type=int, help="Number of parallel analysis workers (default: from config)")
-def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional[int]):
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed hook logs and debugging output")
+def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional[int], verbose: bool):
     """Analyze use case implementations using Claude Code."""
     import asyncio
+    import json
     import os
     
     try:
-        # Check for Anthropic API key
-        if not os.getenv("ANTHROPIC_API_KEY"):
-            console.print("[bold red]✗[/bold red] ANTHROPIC_API_KEY environment variable not found.")
+        # Check for Anthropic API key (check both config and environment)
+        config = get_config()
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY") or config.anthropic_api_key
+        if not anthropic_key:
+            console.print("[bold red]✗[/bold red] ANTHROPIC_API_KEY not found.")
             console.print("[dim]Add your Anthropic API key to .env file or environment.[/dim]")
             sys.exit(1)
         
@@ -441,7 +445,10 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
         console.print()
         
         # Create analyzer
-        analyzer = ClaudeAnalyzer()
+        analyzer = ClaudeAnalyzer(verbose=verbose)
+        
+        if verbose:
+            console.print("[dim]Running in verbose mode - detailed hook logs will be shown[/dim]")
         
         # Get worker count from config if not specified
         config = get_config()
@@ -450,9 +457,57 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
         
         if use_case:
             console.print(f"[yellow]Analyzing use case {use_case} only...[/yellow]")
-            # TODO: Implement single use case analysis
-            console.print("[red]Single use case analysis not yet implemented.[/red]")
-            sys.exit(1)
+            
+            async def run_single_use_case_analysis():
+                try:
+                    result = await analyzer.analyze_single_use_case(run_id, use_case)
+                    return result
+                except Exception as e:
+                    console.print(f"[bold red]✗[/bold red] Single use case analysis failed: {e}")
+                    sys.exit(1)
+            
+            # Run single use case analysis
+            result = asyncio.run(run_single_use_case_analysis())
+            
+            console.print()
+            console.print("[bold green]✓[/bold green] Single use case analysis completed!")
+            
+            # Show result for single use case
+            if "error" in result:
+                console.print(f"[bold red]✗[/bold red] Analysis failed: {result['error']}")
+            else:
+                console.print(f"[bold]Use Case {use_case} Results:[/bold]")
+                console.print(f"Name: [cyan]{result.get('use_case_name', 'Unknown')}[/cyan]")
+                
+                code_exec = result.get("code_executability", {})
+                is_executable = code_exec.get("is_executable", False)
+                status_color = "green" if is_executable else "red"
+                console.print(f"Executable: [{status_color}]{is_executable}[/{status_color}]")
+                
+                if not is_executable:
+                    failure_reason = code_exec.get("failure_reason", "Unknown")
+                    console.print(f"Failure reason: [red]{failure_reason}[/red]")
+                
+                lib_usage = result.get("underlying_library_usage", {})
+                was_used = lib_usage.get("was_used", False)
+                was_mocked = lib_usage.get("was_mocked", False)
+                console.print(f"Library used: [cyan]{was_used}[/cyan], Mocked: [cyan]{was_mocked}[/cyan]")
+                
+                quality = result.get("quality_assessment", {})
+                overall_score = quality.get("overall_score", "N/A")
+                console.print(f"Overall score: [cyan]{overall_score}[/cyan]")
+            
+            # Show result file location (already saved by analyzer)
+            try:
+                context = RunContext.load(run_id)
+                use_case_dir = context.data_dir / f"use_case_{use_case}"
+                result_file = use_case_dir / f"use_case_{use_case}_analysis.json"
+                if result_file.exists():
+                    console.print(f"• Analysis result saved: [cyan]{result_file}[/cyan]")
+                else:
+                    console.print(f"[yellow]Warning: Expected result file not found: {result_file}[/yellow]")
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not locate result file: {e}[/yellow]")
         else:
             # Validate workers count
             if workers < 1 or workers > 10:
