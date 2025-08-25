@@ -27,6 +27,11 @@ class Config(BaseSettings):
     default_agent: str = "cursor"
     env_file_path: str = ".env"  # Path to environment file relative to repository root
     
+    # Claude Code analysis settings
+    anthropic_api_key: Optional[str] = None
+    claude_model: str = "claude-sonnet-4"
+    analysis_max_turns: int = 30
+    
     # Logging
     log_level: str = "INFO"
     

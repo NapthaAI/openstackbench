@@ -130,6 +130,29 @@ This command:
 - Shows target directory and next steps
 - Currently supports Cursor IDE agent
 
+**`stackbench analyze <run-id>`**
+Analyze use case implementations using Claude Code.
+
+```bash
+# Analyze all use cases in a run
+stackbench analyze 4a72004a-592b-49b7-9920-08cf54485f85
+
+# Analyze specific use case only
+stackbench analyze <run-id> --use-case 2
+
+# Force re-analysis even if already completed
+stackbench analyze <run-id> --force
+```
+
+This command:
+- **Requires Claude Code CLI**: Install with `npm install -g @anthropic-ai/claude-code`
+- **Requires ANTHROPIC_API_KEY**: Set in your environment or .env file
+- Tests code executability by running implementation files
+- Analyzes library usage patterns (real vs mocked implementations)
+- Evaluates documentation consultation from code comments
+- Generates structured JSON results and quality assessments
+- Updates run phase to "analyzed"
+
 ### Workflow Examples
 
 **Manual IDE Workflow (Cursor)**:
