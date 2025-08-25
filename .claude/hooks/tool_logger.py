@@ -95,6 +95,12 @@ def log_posttooluse():
 
 def main():
     """Main entry point - determine which hook is being called."""
+    # Only run tool logger if agent is stackbench_analyzer
+    agent = os.environ.get('CLAUDE_AGENT', 'unknown')
+    if agent != 'stackbench_analyzer':
+        # Exit silently for non-stackbench agents
+        sys.exit(0)
+    
     hook_type = os.environ.get('CLAUDE_HOOK_TYPE', 'PreToolUse')
     
     if len(sys.argv) > 1:
