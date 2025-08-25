@@ -9,6 +9,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from .config import get_config
 from .core.repository import RepositoryManager
 from .core.run_context import RunContext
 from .extractors.extractor import extract_use_cases
@@ -386,7 +387,8 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str], copy: bool):
 @click.argument("run_id")
 @click.option("--use-case", "-u", type=int, help="Analyze specific use case only (1-based)")
 @click.option("--force", is_flag=True, help="Force re-analysis even if already completed")
-def analyze(run_id: str, use_case: Optional[int], force: bool):
+@click.option("--workers", "-w", type=int, help="Number of parallel analysis workers (default: from config)")
+def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional[int]):
     """Analyze use case implementations using Claude Code."""
     import asyncio
     import os
@@ -441,17 +443,27 @@ def analyze(run_id: str, use_case: Optional[int], force: bool):
         # Create analyzer
         analyzer = ClaudeAnalyzer()
         
+        # Get worker count from config if not specified
+        config = get_config()
+        if workers is None:
+            workers = config.analysis_max_workers
+        
         if use_case:
             console.print(f"[yellow]Analyzing use case {use_case} only...[/yellow]")
             # TODO: Implement single use case analysis
             console.print("[red]Single use case analysis not yet implemented.[/red]")
             sys.exit(1)
         else:
-            console.print("[yellow]Analyzing all use cases...[/yellow]")
+            # Validate workers count
+            if workers < 1 or workers > 10:
+                console.print("[bold red]✗[/bold red] Number of workers must be between 1 and 10")
+                sys.exit(1)
+            
+            console.print(f"[yellow]Analyzing all use cases with {workers} parallel workers...[/yellow]")
             
             async def run_analysis():
                 try:
-                    result = await analyzer.analyze_run(run_id)
+                    result = await analyzer.analyze_run(run_id, max_workers=workers)
                     return result
                 except Exception as e:
                     console.print(f"[bold red]✗[/bold red] Analysis failed: {e}")
