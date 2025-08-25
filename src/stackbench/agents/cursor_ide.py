@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from .base import Agent
-from ..config import get_config
+from ..config import get_config, find_env_file
 
 
 class CursorIDEAgent(Agent):
@@ -33,6 +33,10 @@ class CursorIDEAgent(Agent):
             relative_repo_dir = context.repo_dir.relative_to(Path.cwd())
         except ValueError:
             relative_repo_dir = context.repo_dir
+        
+        # Get environment file path
+        env_file = find_env_file()
+        env_path_info = str(env_file) if env_file else ".env"
         
         prompt = f"""# {use_case.name}
 
@@ -87,7 +91,7 @@ Please implement the use case described above.
 # - Handled edge cases based on API documentation
 ```
 
-**Environment Setup:** Check for and load any environment file at `{context.config.env_file_path}` (relative to your current working directory) if it exists. This may contain important configuration variables, API keys, or settings needed for the library to work properly.
+**Environment Setup:** Check for and load any environment file at `{env_path_info}` if it exists. This may contain important configuration variables, API keys, or settings needed for the library to work properly.
 
 ### Implementation Requirements:
 - Meet all functional requirements listed above
