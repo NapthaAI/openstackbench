@@ -259,8 +259,8 @@ Save your analysis as a JSON file with this structure:
                 }
             }
     
-    async def analyze_run(self, run_id: str) -> Dict:
-        """Analyze all use cases in a benchmark run."""
+    async def analyze_run(self, run_id: str, max_workers: int = 3) -> Dict:
+        """Analyze all use cases in a benchmark run with parallel processing."""
         
         try:
             context = RunContext.load(run_id)
@@ -277,24 +277,87 @@ Save your analysis as a JSON file with this structure:
         except Exception as e:
             raise ValueError(f"Could not load use cases: {e}")
         
-        # Analyze each use case
-        use_case_results = []
+        # Check for existing analysis results to support resume capability
+        results_file = context.data_dir / "results.json"
+        existing_results = {}
+        if results_file.exists():
+            try:
+                with open(results_file, 'r') as f:
+                    existing_data = json.load(f)
+                    # Create a map of use case number to existing results
+                    for result in existing_data.get("use_case_results", []):
+                        use_case_num = result.get("use_case_number")
+                        if use_case_num and not result.get("error"):
+                            existing_results[use_case_num] = result
+                print(f"Found {len(existing_results)} previously analyzed use cases")
+            except Exception as e:
+                print(f"Warning: Could not load existing results: {e}")
+        
+        # Create queue of use cases to analyze (excluding already completed ones)
+        pending_use_cases = []
+        completed_results = []
+        
+        for i, use_case in enumerate(use_cases, 1):
+            if i in existing_results:
+                print(f"Skipping use case {i}/{len(use_cases)}: {use_case.name} (already analyzed)")
+                completed_results.append(existing_results[i])
+            else:
+                pending_use_cases.append((i, use_case))
+        
+        print(f"Analyzing {len(pending_use_cases)} remaining use cases with {max_workers} workers")
+        
+        # Process use cases in parallel with semaphore to limit concurrency
+        semaphore = asyncio.Semaphore(max_workers)
+        
+        async def analyze_with_semaphore(use_case_number: int, use_case: UseCase):
+            async with semaphore:
+                print(f"[Worker] Starting use case {use_case_number}/{len(use_cases)}: {use_case.name}")
+                result = await self.analyze_use_case(
+                    run_id=run_id,
+                    use_case_number=use_case_number,
+                    use_case=use_case,
+                    context=context
+                )
+                print(f"[Worker] Completed use case {use_case_number}: {result.get('use_case_name', 'Unknown')}")
+                return result
+        
+        # Execute all pending analyses concurrently
+        if pending_use_cases:
+            tasks = [
+                analyze_with_semaphore(use_case_number, use_case)
+                for use_case_number, use_case in pending_use_cases
+            ]
+            
+            # Wait for all tasks to complete
+            new_results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Handle any exceptions that occurred
+            for i, result in enumerate(new_results):
+                if isinstance(result, Exception):
+                    use_case_number, use_case = pending_use_cases[i]
+                    error_result = {
+                        "use_case_number": use_case_number,
+                        "use_case_name": use_case.name,
+                        "error": f"Analysis failed: {str(result)}",
+                        "code_executability": {
+                            "is_executable": False,
+                            "execution_result": f"Analysis error: {str(result)}",
+                            "failure_reason": "Analysis process failed",
+                            "failed_due_to_api_key_error": "ANTHROPIC_API_KEY" in str(result)
+                        }
+                    }
+                    new_results[i] = error_result
+            
+            completed_results.extend(new_results)
+        
+        # Sort results by use case number to maintain order
+        use_case_results = sorted(completed_results, key=lambda x: x.get("use_case_number", 0))
+        
+        # Calculate success metrics
         successful_cases = 0
         failed_cases = 0
         
-        for i, use_case in enumerate(use_cases, 1):
-            print(f"Analyzing use case {i}/{len(use_cases)}: {use_case.name}")
-            
-            result = await self.analyze_use_case(
-                run_id=run_id,
-                use_case_number=i,
-                use_case=use_case,
-                context=context
-            )
-            
-            use_case_results.append(result)
-            
-            # Track success/failure
+        for result in use_case_results:
             if result.get("code_executability", {}).get("is_executable", False):
                 successful_cases += 1
             else:
