@@ -8,13 +8,15 @@ import uuid
 import click
 from rich.console import Console
 from rich.table import Table
+import subprocess
 
 from .config import get_config
 from .core.repository import RepositoryManager
 from .core.run_context import RunContext, RunPhase
 from .extractors.extractor import extract_use_cases
 from .agents.cursor_ide import CursorIDEAgent
-from .analyzers.claude_analyzer import ClaudeAnalyzer
+from .analyzers.individual_analyzer import IndividualAnalyzer
+from .analyzers.overall_analyzer import OverallAnalyzer
 
 console = Console()
 
@@ -444,7 +446,8 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str], copy: bool):
 @click.option("--force", is_flag=True, help="Force re-analysis even if already completed")
 @click.option("--workers", "-w", type=int, help="Number of parallel analysis workers (default: from config)")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed hook logs and debugging output")
-def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional[int], verbose: bool):
+@click.option("--skip-overall", is_flag=True, help="Skip overall analysis report generation")
+def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional[int], verbose: bool, skip_overall: bool):
     """Analyze use case implementations using Claude Code."""
     import asyncio
     import os
@@ -459,7 +462,6 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
             sys.exit(1)
         
         # Check if Node.js Claude Code CLI is installed
-        import subprocess
         try:
             result = subprocess.run(["claude", "--version"], capture_output=True, text=True)
             if result.returncode != 0:
@@ -503,7 +505,7 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
         console.print()
         
         # Create analyzer
-        analyzer = ClaudeAnalyzer(verbose=verbose)
+        analyzer = IndividualAnalyzer(verbose=verbose)
         
         if verbose:
             console.print("[dim]Running in verbose mode - detailed hook logs will be shown[/dim]")
@@ -614,6 +616,61 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
             if not context.status.individual_analysis_completed:
                 context.mark_individual_analysis_completed()
                 console.print(f"• Individual analysis status updated to: [green]completed[/green]")
+            
+            # Run overall analysis if not skipped and individual analysis is complete
+            if not skip_overall and not use_case:  # Only run overall analysis for full runs, not single use case
+                console.print()
+                console.print("[bold blue]Generating Overall Analysis Report...[/bold blue]")
+                
+                try:
+                    # Create overall analyzer
+                    overall_analyzer = OverallAnalyzer(verbose=verbose)
+                    
+                    with console.status("[bold green]Generating results.json and results.md..."):
+                        async def run_overall_analysis():
+                            try:
+                                result_paths = await overall_analyzer.analyze_run(run_id)
+                                return result_paths
+                            except Exception as e:
+                                console.print(f"[bold red]✗[/bold red] Overall analysis failed: {e}")
+                                return None
+                        
+                        # Run overall analysis
+                        result_paths = asyncio.run(run_overall_analysis())
+                        
+                        if result_paths:
+                            console.print("[bold green]✓[/bold green] Overall analysis completed successfully!")
+                            console.print()
+                            console.print("[bold]Generated Files:[/bold]")
+                            console.print(f"• [cyan]results.json[/cyan]: {result_paths['results_json']}")
+                            console.print(f"• [cyan]results.md[/cyan]: {result_paths['results_markdown']}")
+                            console.print()
+                            console.print("[bold]Analysis Summary:[/bold]")
+                            
+                            # Load and show key metrics from results.json
+                            try:
+                                import json
+                                with open(result_paths['results_json'], 'r') as f:
+                                    results_data = json.load(f)
+                                
+                                summary = results_data['overall_summary']
+                                pass_fail = summary['pass_fail_status']
+                                success_rate = summary['success_rate']
+                                successful_cases = summary['successful_cases']
+                                total_cases = summary['total_use_cases']
+                                
+                                status_color = "green" if pass_fail == "PASS" else "red"
+                                console.print(f"• Status: [{status_color}]{pass_fail}[/{status_color}]")
+                                console.print(f"• Success Rate: [cyan]{success_rate:.1f}%[/cyan] ({successful_cases}/{total_cases} use cases)")
+                                
+                            except Exception as e:
+                                console.print(f"[yellow]Warning: Could not load results summary: {e}[/yellow]")
+                        else:
+                            console.print("[yellow]⚠[/yellow] Overall analysis failed, but individual analysis results are available.")
+                            
+                except Exception as e:
+                    console.print(f"[bold red]✗[/bold red] Failed to run overall analysis: {e}")
+                    console.print("[yellow]Individual analysis results are still available.[/yellow]")
     
     except KeyboardInterrupt:
         console.print("\n[yellow]Analysis interrupted by user.[/yellow]")
