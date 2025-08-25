@@ -14,7 +14,7 @@ from ..extractors.models import UseCase
 from ..extractors.extractor import load_use_cases
 from .models import UseCaseAnalysisResult
 
-class ClaudeAnalyzer:
+class IndividualAnalyzer:
     """Claude Code-powered analyzer for use case implementations."""
     
     def __init__(self, config: Optional[Dict] = None, verbose: bool = False):
@@ -435,7 +435,7 @@ Save your analysis as a JSON file with this structure:
         use_case_results = sorted(completed_results, key=lambda x: x.get("use_case_number", 0))
         
         # Update run context
-        context.mark_analysis_completed()
+        context.mark_individual_analysis_completed()
         
         return use_case_results
     
