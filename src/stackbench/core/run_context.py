@@ -3,13 +3,87 @@
 import json
 import uuid
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..config import get_config
+
+if TYPE_CHECKING:
+    from ..extractors.models import UseCase
+
+
+class ExecutionStatus(str, Enum):
+    """Execution status for use cases."""
+    NOT_EXECUTED = "not_executed"
+    EXECUTED = "executed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class AnalysisStatus(str, Enum):
+    """Analysis status for use cases."""
+    NOT_ANALYZED = "not_analyzed"
+    ANALYZED = "analyzed"
+    FAILED = "failed"
+
+
+class RunPhase(str, Enum):
+    """Run phases for benchmark execution."""
+    CREATED = "created"
+    CLONED = "cloned"
+    EXTRACTED = "extracted"
+    EXECUTION = "execution"
+    ANALYSIS_INDIVIDUAL = "analysis_individual"
+    ANALYSIS_OVERALL = "analysis_overall"
+    COMPLETED = "completed"
+
+
+class ExecutionMethod(str, Enum):
+    """Execution methods for use cases."""
+    IDE_MANUAL = "ide_manual"
+    CLI_AUTOMATED = "cli_automated"
+
+
+class UseCaseState(BaseModel):
+    """State tracking for an individual use case."""
+    
+    use_case_number: int
+    name: str
+    target_file: str = "solution.py"
+    
+    # Execution tracking
+    execution_status: ExecutionStatus = ExecutionStatus.NOT_EXECUTED
+    executed_at: Optional[datetime] = None
+    execution_method: Optional[ExecutionMethod] = None
+    execution_error: Optional[str] = None
+    
+    # Analysis tracking
+    analysis_status: AnalysisStatus = AnalysisStatus.NOT_ANALYZED
+    analyzed_at: Optional[datetime] = None
+    analysis_error: Optional[str] = None
+    
+    # File tracking
+    implementation_exists: bool = False
+    analysis_exists: bool = False
+    
+    @property
+    def is_executed(self) -> bool:
+        """Check if use case has been executed successfully."""
+        return self.execution_status == ExecutionStatus.EXECUTED
+    
+    @property
+    def is_analyzed(self) -> bool:
+        """Check if use case has been analyzed successfully."""
+        return self.analysis_status == AnalysisStatus.ANALYZED
+    
+    @property
+    def can_be_analyzed(self) -> bool:
+        """Check if use case is ready for analysis (executed and has implementation file)."""
+        return self.is_executed and self.implementation_exists
 
 
 class RunConfig(BaseModel):
@@ -34,28 +108,73 @@ class RunConfig(BaseModel):
 
 
 class RunStatus(BaseModel):
-    """Status tracking for a benchmark run."""
+    """Enhanced status tracking for a benchmark run with use case level state."""
     
-    phase: str = "created"  # created, cloned, extracted, executed, analyzed, completed, failed
+    # Phase tracking with new enhanced phases
+    phase: RunPhase = RunPhase.CREATED
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     
-    # Phase completion tracking
+    # Phase completion flags
     clone_completed: bool = False
     extraction_completed: bool = False
-    execution_completed: bool = False
-    analysis_completed: bool = False
+    execution_phase_completed: bool = False  # All use cases executed
+    individual_analysis_completed: bool = False  # All use cases analyzed
+    overall_analysis_completed: bool = False  # results.json + results.md generated
     
-    # Counts
+    # Use case state tracking
+    use_cases: Dict[int, UseCaseState] = Field(default_factory=dict)
     total_use_cases: int = 0
-    executed_use_cases: int = 0
-    successful_executions: int = 0
-    failed_executions: int = 0
     
     # Error tracking
     errors: List[str] = Field(default_factory=list)
     
-    def update_phase(self, new_phase: str) -> None:
+    # Dynamic properties calculated from use_cases
+    @property
+    def executed_count(self) -> int:
+        """Count of executed use cases."""
+        return sum(1 for uc in self.use_cases.values() if uc.is_executed)
+    
+    @property
+    def analyzed_count(self) -> int:
+        """Count of analyzed use cases."""
+        return sum(1 for uc in self.use_cases.values() if uc.is_analyzed)
+    
+    @property
+    def execution_success_count(self) -> int:
+        """Count of successfully executed use cases."""
+        return sum(1 for uc in self.use_cases.values() if uc.execution_status == ExecutionStatus.EXECUTED)
+    
+    @property
+    def execution_failed_count(self) -> int:
+        """Count of failed executions."""
+        return sum(1 for uc in self.use_cases.values() if uc.execution_status == ExecutionStatus.FAILED)
+    
+    @property
+    def analysis_success_count(self) -> int:
+        """Count of successfully analyzed use cases."""
+        return sum(1 for uc in self.use_cases.values() if uc.analysis_status == AnalysisStatus.ANALYZED)
+    
+    @property
+    def analysis_failed_count(self) -> int:
+        """Count of failed analyses."""
+        return sum(1 for uc in self.use_cases.values() if uc.analysis_status == AnalysisStatus.FAILED)
+    
+    @property
+    def execution_progress(self) -> float:
+        """Execution progress as a fraction (0.0 to 1.0)."""
+        if self.total_use_cases == 0:
+            return 0.0
+        return self.executed_count / self.total_use_cases
+    
+    @property
+    def analysis_progress(self) -> float:
+        """Analysis progress as a fraction (0.0 to 1.0)."""
+        if self.executed_count == 0:
+            return 0.0
+        return self.analyzed_count / self.executed_count
+    
+    def update_phase(self, new_phase: RunPhase) -> None:
         """Update the current phase and timestamp."""
         self.phase = new_phase
         self.updated_at = datetime.now()
@@ -63,6 +182,129 @@ class RunStatus(BaseModel):
     def add_error(self, error: str) -> None:
         """Add an error to the tracking list."""
         self.errors.append(f"{datetime.now().isoformat()}: {error}")
+    
+    # State management methods
+    def initialize_use_cases(self, use_cases: List["UseCase"]) -> None:
+        """Initialize use case tracking from extracted use cases."""
+        self.total_use_cases = len(use_cases)
+        for i, use_case in enumerate(use_cases, 1):
+            self.use_cases[i] = UseCaseState(
+                use_case_number=i,
+                name=use_case.name,
+                target_file=use_case.target_file
+            )
+        self.updated_at = datetime.now()
+    
+    def mark_use_case_executed(
+        self, 
+        use_case_number: int, 
+        method: ExecutionMethod, 
+        implementation_file: Optional[Path] = None,
+        error: Optional[str] = None
+    ) -> None:
+        """Mark a use case as executed."""
+        if use_case_number not in self.use_cases:
+            raise ValueError(f"Use case {use_case_number} not found")
+        
+        uc = self.use_cases[use_case_number]
+        uc.execution_status = ExecutionStatus.EXECUTED if error is None else ExecutionStatus.FAILED
+        uc.executed_at = datetime.now()
+        uc.execution_method = method
+        uc.execution_error = error
+        uc.implementation_exists = implementation_file is not None and implementation_file.exists() if implementation_file else False
+        self.updated_at = datetime.now()
+    
+    def mark_use_case_analyzed(
+        self, 
+        use_case_number: int, 
+        analysis_file: Optional[Path] = None,
+        error: Optional[str] = None
+    ) -> None:
+        """Mark a use case as analyzed."""
+        if use_case_number not in self.use_cases:
+            raise ValueError(f"Use case {use_case_number} not found")
+        
+        uc = self.use_cases[use_case_number]
+        uc.analysis_status = AnalysisStatus.ANALYZED if error is None else AnalysisStatus.FAILED
+        uc.analyzed_at = datetime.now()
+        uc.analysis_error = error
+        uc.analysis_exists = analysis_file is not None and analysis_file.exists() if analysis_file else False
+        self.updated_at = datetime.now()
+    
+    def detect_completed_implementations(self, data_dir: Path) -> List[int]:
+        """Simple detection: check if use case directories exist and have solution files."""
+        completed = []
+        for use_case_num in self.use_cases.keys():
+            use_case_dir = data_dir / f"use_case_{use_case_num}"
+            
+            # Check if directory exists and has any files starting with "solution"
+            if use_case_dir.exists():
+                solution_files = list(use_case_dir.glob("solution*"))
+                if solution_files:
+                    self.use_cases[use_case_num].implementation_exists = True
+                    completed.append(use_case_num)
+        
+        self.updated_at = datetime.now()
+        return completed
+    
+    # Progress query methods
+    def get_pending_execution(self) -> List[int]:
+        """Get list of use case numbers that need to be executed."""
+        return [num for num, uc in self.use_cases.items() 
+                if uc.execution_status == ExecutionStatus.NOT_EXECUTED]
+    
+    def get_pending_analysis(self) -> List[int]:
+        """Get list of use case numbers that can be analyzed but haven't been."""
+        return [num for num, uc in self.use_cases.items() 
+                if uc.can_be_analyzed and uc.analysis_status == AnalysisStatus.NOT_ANALYZED]
+    
+    def get_ready_for_analysis(self) -> List[int]:
+        """Get use cases that are ready to be analyzed (executed with implementation files)."""
+        return [num for num, uc in self.use_cases.items() if uc.can_be_analyzed]
+    
+    # Phase transition logic
+    def is_ready_for_execution_phase(self) -> bool:
+        """Check if ready to enter execution phase."""
+        return self.extraction_completed and len(self.use_cases) > 0
+    
+    def is_ready_for_individual_analysis(self) -> bool:
+        """Check if ready to start individual analysis phase."""
+        return self.execution_phase_completed and self.executed_count > 0
+    
+    def is_ready_for_overall_analysis(self) -> bool:
+        """Check if ready for overall analysis (results.json/md generation)."""
+        return (self.individual_analysis_completed and 
+                self.analyzed_count > 0)
+    
+    def can_complete_execution_phase(self) -> bool:
+        """Check if execution phase can be marked as complete."""
+        # For CLI agents: all use cases executed
+        # For IDE agents: manually marked complete or all detected as implemented
+        return self.executed_count == self.total_use_cases or self.execution_phase_completed
+    
+    def can_complete_individual_analysis(self) -> bool:
+        """Check if individual analysis phase can be marked as complete."""
+        ready_count = len(self.get_ready_for_analysis())
+        return ready_count > 0 and self.analyzed_count == ready_count
+    
+    def update_phase_automatically(self) -> RunPhase:
+        """Update phase based on current state and return new phase."""
+        if self.phase == RunPhase.CREATED and self.clone_completed:
+            self.update_phase(RunPhase.CLONED)
+        elif self.phase == RunPhase.CLONED and self.extraction_completed:
+            self.update_phase(RunPhase.EXTRACTED)
+        elif self.phase == RunPhase.EXTRACTED and self.is_ready_for_execution_phase():
+            self.update_phase(RunPhase.EXECUTION)
+        elif self.phase == RunPhase.EXECUTION and self.can_complete_execution_phase():
+            self.execution_phase_completed = True
+            self.update_phase(RunPhase.ANALYSIS_INDIVIDUAL)
+        elif self.phase == RunPhase.ANALYSIS_INDIVIDUAL and self.can_complete_individual_analysis():
+            self.individual_analysis_completed = True
+            self.update_phase(RunPhase.ANALYSIS_OVERALL)
+        elif self.phase == RunPhase.ANALYSIS_OVERALL and self.overall_analysis_completed:
+            self.update_phase(RunPhase.COMPLETED)
+        
+        return self.phase
 
 
 class RunContext(BaseModel):
@@ -194,35 +436,81 @@ class RunContext(BaseModel):
     def mark_clone_completed(self) -> None:
         """Mark the clone phase as completed."""
         self.status.clone_completed = True
-        self.status.update_phase("cloned")
+        self.status.update_phase(RunPhase.CLONED)
         self.save()
     
-    def mark_extraction_completed(self, total_use_cases: int) -> None:
-        """Mark the extraction phase as completed."""
+    def mark_extraction_completed(self, use_cases: List["UseCase"]) -> None:
+        """Mark the extraction phase as completed and initialize use case tracking."""
         self.status.extraction_completed = True
-        self.status.total_use_cases = total_use_cases
-        self.status.update_phase("extracted")
+        self.status.initialize_use_cases(use_cases)
+        self.status.update_phase_automatically()
         self.save()
     
-    def mark_execution_completed(self, successful: int, failed: int) -> None:
+    def mark_execution_phase_completed(self) -> None:
         """Mark the execution phase as completed."""
-        self.status.execution_completed = True
-        self.status.executed_use_cases = successful + failed
-        self.status.successful_executions = successful
-        self.status.failed_executions = failed
-        self.status.update_phase("executed")
+        self.status.execution_phase_completed = True
+        self.status.update_phase_automatically()
         self.save()
     
-    def mark_analysis_completed(self) -> None:
-        """Mark the analysis phase as completed."""
-        self.status.analysis_completed = True
-        self.status.update_phase("analyzed")
+    def mark_individual_analysis_completed(self) -> None:
+        """Mark individual analysis phase as completed."""
+        self.status.individual_analysis_completed = True
+        self.status.update_phase_automatically()
+        self.save()
+    
+    def mark_overall_analysis_completed(self) -> None:
+        """Mark overall analysis phase as completed."""
+        self.status.overall_analysis_completed = True
+        self.status.update_phase_automatically()
         self.save()
     
     def add_error(self, error: str) -> None:
         """Add an error to the run context."""
         self.status.add_error(error)
         self.save()
+    
+    def mark_use_case_executed(
+        self, 
+        use_case_number: int, 
+        method: ExecutionMethod, 
+        implementation_file: Optional[Path] = None,
+        error: Optional[str] = None
+    ) -> None:
+        """Mark a use case as executed and save context."""
+        self.status.mark_use_case_executed(use_case_number, method, implementation_file, error)
+        self.save()
+    
+    def mark_use_case_analyzed(
+        self, 
+        use_case_number: int, 
+        analysis_file: Optional[Path] = None,
+        error: Optional[str] = None
+    ) -> None:
+        """Mark a use case as analyzed and save context."""
+        self.status.mark_use_case_analyzed(use_case_number, analysis_file, error)
+        self.save()
+    
+    def detect_and_update_manual_implementations(self) -> List[int]:
+        """Simple detection and update for IDE manual implementations."""
+        # Find use cases with implementation files
+        completed = self.status.detect_completed_implementations(self.data_dir)
+        
+        newly_detected = []
+        for use_case_num in completed:
+            uc = self.status.use_cases[use_case_num]
+            # Only update if not already marked as executed
+            if uc.execution_status == ExecutionStatus.NOT_EXECUTED:
+                uc.execution_status = ExecutionStatus.EXECUTED
+                uc.execution_method = ExecutionMethod.IDE_MANUAL
+                uc.executed_at = datetime.now()
+                newly_detected.append(use_case_num)
+        
+        # Update phase if we detected new implementations
+        if newly_detected:
+            self.status.update_phase_automatically()
+            self.save()
+        
+        return newly_detected
     
     def is_manual_agent(self) -> bool:
         """Check if this run uses a manual (IDE) agent."""
@@ -239,10 +527,10 @@ class RunContext(BaseModel):
             "phase": self.status.phase,
             "created_at": self.status.created_at.isoformat(),
             "total_use_cases": self.status.total_use_cases,
-            "executed_use_cases": self.status.executed_use_cases,
+            "executed_use_cases": self.status.executed_count,
             "success_rate": (
-                self.status.successful_executions / self.status.executed_use_cases 
-                if self.status.executed_use_cases > 0 else 0
+                self.status.execution_success_count / self.status.executed_count 
+                if self.status.executed_count > 0 else 0
             ),
             "has_errors": len(self.status.errors) > 0
         }

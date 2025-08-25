@@ -11,7 +11,7 @@ from rich.table import Table
 
 from .config import get_config
 from .core.repository import RepositoryManager
-from .core.run_context import RunContext
+from .core.run_context import RunContext, RunPhase
 from .extractors.extractor import extract_use_cases
 from .agents.cursor_ide import CursorIDEAgent
 from .analyzers.claude_analyzer import ClaudeAnalyzer
@@ -43,18 +43,22 @@ def parse_include_folders(include_folders_str: str) -> List[str]:
     return [folder.strip() for folder in include_folders_str.split(",") if folder.strip()]
 
 
-def get_phase_color(phase: str) -> str:
+def get_phase_color(phase) -> str:
     """Get color for phase status."""
+    # Handle both enum and string values
+    phase_str = phase.value if hasattr(phase, 'value') else str(phase)
+    
     color_map = {
         "created": "dim",
         "cloned": "blue", 
         "extracted": "yellow",
-        "executed": "cyan",
-        "analyzed": "green",
+        "execution": "cyan",
+        "analysis_individual": "green",
+        "analysis_overall": "green",
         "completed": "bold green",
         "failed": "bold red"
     }
-    return color_map.get(phase, "white")
+    return color_map.get(phase_str, "white")
 
 
 def format_datetime(dt_str: str) -> str:
@@ -137,6 +141,7 @@ def clone(repo_url: str, include_folders: str, branch: str):
 @cli.command("list")
 def list_runs():
     """List all benchmark runs with their status."""
+    show_logo()
     try:
         repo_manager = RepositoryManager()
         run_ids = repo_manager.list_runs()
@@ -161,6 +166,11 @@ def list_runs():
         for run_id in run_ids:
             try:
                 context = RunContext.load(run_id)
+                
+                # For manual agents, detect any new implementations
+                if context.is_manual_agent():
+                    context.detect_and_update_manual_implementations()
+                
                 summary = context.to_summary_dict()
                 runs_data.append((summary, context))
             except Exception as e:
@@ -173,16 +183,40 @@ def list_runs():
         # Add rows to table
         for summary, context in runs_data:
             full_run_id = summary["run_id"]
-            phase_colored = f"[{get_phase_color(summary['phase'])}]{summary['phase']}[/{get_phase_color(summary['phase'])}]"
+            phase = summary["phase"]
+            phase_str = phase.value if hasattr(phase, 'value') else str(phase)
+            phase_colored = f"[{get_phase_color(phase)}]{phase_str}[/{get_phase_color(phase)}]"
             
-            # Status column
+            # Status column - show meaningful progress information
             status_parts = []
+            
+            # Show errors if any
             if summary["has_errors"]:
                 status_parts.append("[red]⚠ errors[/red]")
+            
+            # Show execution progress for runs with use cases
             if summary["total_use_cases"] > 0:
+                executed = summary["executed_use_cases"]
+                total = summary["total_use_cases"]
+                
+                # Show execution progress
+                if executed > 0:
+                    status_parts.append(f"[cyan]{executed}/{total} executed[/cyan]")
+                
+                # Show success rate if we have completed executions
                 success_rate = summary["success_rate"]
                 if success_rate > 0:
                     status_parts.append(f"[green]{success_rate:.0%} success[/green]")
+                elif executed == 0 and context.status.phase.value in ["execution", "analysis_individual", "analysis_overall"]:
+                    status_parts.append("[yellow]pending execution[/yellow]")
+            else:
+                # No use cases yet
+                if context.status.phase.value == "extracted":
+                    status_parts.append("[yellow]ready for execution[/yellow]")
+                elif context.status.phase.value == "cloned":
+                    status_parts.append("[blue]ready for extraction[/blue]")
+                elif context.status.phase.value == "created":
+                    status_parts.append("[dim]ready for clone[/dim]")
             
             status = " | ".join(status_parts) if status_parts else "[dim]—[/dim]"
             
@@ -214,11 +248,11 @@ def extract(run_id: str):
         context = RunContext.load(run_id)
         
         # Validate run phase
-        if context.status.phase != "cloned":
+        if context.status.phase != RunPhase.CLONED:
             console.print(f"[bold red]✗[/bold red] Run must be in 'cloned' phase, currently: {context.status.phase}")
-            if context.status.phase == "created":
+            if context.status.phase == RunPhase.CREATED:
                 console.print("[dim]Use 'stackbench clone <repo-url>' first to clone the repository.[/dim]")
-            elif context.status.phase == "extracted":
+            elif context.status.phase == RunPhase.EXTRACTED:
                 console.print("[dim]Use cases already extracted. Use 'stackbench list' to see details.[/dim]")
             sys.exit(1)
         
@@ -239,6 +273,9 @@ def extract(run_id: str):
                 console.print(f"[bold red]✗[/bold red] Extraction failed: {e}")
                 context.add_error(f"Extraction failed: {str(e)}")
                 sys.exit(1)
+        
+        # Mark extraction as completed with use cases
+        context.mark_extraction_completed(result.final_use_cases)
         
         # Display results
         console.print(f"[bold green]✓[/bold green] Extraction completed!")
@@ -306,11 +343,16 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str], copy: bool):
         context = RunContext.load(run_id)
         
         # Validate run phase
-        if context.status.phase not in ["extracted", "executed", "analyzed"]:
+        valid_phases = [RunPhase.EXTRACTED, RunPhase.EXECUTION, RunPhase.ANALYSIS_INDIVIDUAL, RunPhase.ANALYSIS_OVERALL, RunPhase.COMPLETED]
+        if context.status.phase not in valid_phases:
             console.print(f"[bold red]✗[/bold red] Run must be extracted first, currently: {context.status.phase}")
-            if context.status.phase == "cloned":
+            if context.status.phase == RunPhase.CLONED:
                 console.print("[dim]Use 'stackbench extract <run-id>' first to generate use cases.[/dim]")
             sys.exit(1)
+        
+        # For manual agents, detect any new implementations
+        if context.is_manual_agent():
+            context.detect_and_update_manual_implementations()
         
         # Determine agent to use
         agent_name = agent or context.config.agent_type
@@ -392,7 +434,6 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str], copy: bool):
 def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional[int], verbose: bool):
     """Analyze use case implementations using Claude Code."""
     import asyncio
-    import json
     import os
     
     try:
@@ -424,18 +465,22 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
             sys.exit(1)
         
         # Validate run phase
-        if context.status.phase not in ["extracted", "executed", "analyzed"] and not force:
+        valid_phases = [RunPhase.EXTRACTED, RunPhase.EXECUTION, RunPhase.ANALYSIS_INDIVIDUAL, RunPhase.ANALYSIS_OVERALL, RunPhase.COMPLETED]
+        if context.status.phase not in valid_phases and not force:
             console.print(f"[bold red]✗[/bold red] Run must be extracted first, currently: {context.status.phase}")
-            if context.status.phase == "cloned":
+            if context.status.phase == RunPhase.CLONED:
                 console.print("[dim]Use 'stackbench extract <run-id>' first to generate use cases.[/dim]")
             sys.exit(1)
         
+        # For manual agents, detect any new implementations
+        if context.is_manual_agent():
+            newly_detected = context.detect_and_update_manual_implementations()
+            if newly_detected:
+                console.print(f"[green]Detected {len(newly_detected)} new implementations: {newly_detected}[/green]")
+        
         # Check if already analyzed and not forcing
-        if context.status.phase == "analyzed" and not force:
-            console.print(f"[yellow]⚠[/yellow] Run already analyzed. Use --force to re-analyze.")
-            results_file = context.data_dir / "results.json"
-            if results_file.exists():
-                console.print(f"[dim]Results available at: {results_file}[/dim]")
+        if context.status.individual_analysis_completed and not force:
+            console.print(f"[yellow]⚠[/yellow] Individual analysis already completed. Use --force to re-analyze.")
             return
         
         show_logo()
@@ -552,9 +597,10 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
                 
                 console.print(f"• [{status_color}]{status_text}[/{status_color}] Use Case {use_case_num}: {use_case_name} - [{status_color}]{exec_text}[/{status_color}]")
             
-            if context.status.phase != "analyzed":
-                context.mark_analysis_completed()
-                console.print(f"• Run status updated to: [green]analyzed[/green]")
+            # Mark individual analysis as completed
+            if not context.status.individual_analysis_completed:
+                context.mark_individual_analysis_completed()
+                console.print(f"• Individual analysis status updated to: [green]completed[/green]")
     
     except KeyboardInterrupt:
         console.print("\n[yellow]Analysis interrupted by user.[/yellow]")

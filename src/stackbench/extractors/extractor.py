@@ -181,7 +181,7 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
     save_use_cases(context, result)
     
     # Update run context status
-    context.mark_extraction_completed(len(final_use_cases))
+    context.mark_extraction_completed(final_use_cases)
     
     print(f"Extraction completed: {len(final_use_cases)} use cases from {processed_docs} documents "
           f"in {result.processing_time_seconds:.1f}s")

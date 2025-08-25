@@ -20,7 +20,7 @@ class Config(BaseSettings):
     dspy_max_tokens: int = 10000
     
     # Extraction settings
-    num_use_cases: int = 10
+    num_use_cases: int = 5
     use_case_max_workers: int = 4
     include_folders: List[str] = Field(default=[])
     

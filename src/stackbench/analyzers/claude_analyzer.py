@@ -199,10 +199,14 @@ Save your analysis as a JSON file with this structure:
         target_file_path = use_case_dir / use_case.target_file
         
         if not target_file_path.exists():
+            # Mark as failed analysis due to missing implementation
+            error_msg = f"Implementation file not found: {target_file_path}"
+            context.mark_use_case_analyzed(use_case_number, error=error_msg)
+            
             return {
                 "use_case_number": use_case_number,
                 "use_case_name": use_case.name,
-                "error": f"Implementation file not found: {target_file_path}",
+                "error": error_msg,
                 "code_executability": {
                     "is_executable": False,
                     "execution_result": "File not found",
@@ -292,7 +296,11 @@ Save your analysis as a JSON file with this structure:
                 analysis_file = use_case_dir / f"use_case_{use_case_number}_analysis.json"
                 if analysis_file.exists():
                     with open(analysis_file, 'r') as f:
-                        return json.load(f)
+                        result = json.load(f)
+                    
+                    # Mark use case as analyzed in the context
+                    context.mark_use_case_analyzed(use_case_number, analysis_file)
+                    return result
                 else:
                     # Fallback: try to extract JSON from response text
                     full_text = ''.join(analysis_text)
@@ -300,16 +308,25 @@ Save your analysis as a JSON file with this structure:
                     import re
                     json_match = re.search(r'```json\s*(\{.*?\})\s*```', full_text, re.DOTALL)
                     if json_match:
-                        return json.loads(json_match.group(1))
+                        result = json.loads(json_match.group(1))
+                        # Mark as analyzed even though file wasn't saved correctly
+                        context.mark_use_case_analyzed(use_case_number)
+                        return result
                     else:
+                        # Mark as failed analysis
+                        error_msg = "Could not extract JSON analysis from response"
+                        context.mark_use_case_analyzed(use_case_number, error=error_msg)
                         return {
                             "use_case_number": use_case_number,
                             "use_case_name": use_case.name,
-                            "error": "Could not extract JSON analysis from response",
+                            "error": error_msg,
                             "raw_response": full_text[:1000]  # First 1000 chars for debugging
                         }
                         
         except Exception as e:
+            # Mark use case as having failed analysis
+            context.mark_use_case_analyzed(use_case_number, error=str(e))
+            
             return {
                 "use_case_number": use_case_number,
                 "use_case_name": use_case.name,
