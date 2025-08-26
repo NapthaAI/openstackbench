@@ -204,15 +204,18 @@ class RunStatus(BaseModel):
         self.updated_at = datetime.now()
     
     def detect_completed_implementations(self, data_dir: Path) -> List[int]:
-        """Simple detection: check if use case directories exist and have solution files."""
+        """Detect completed implementations by checking for target files in use case directories."""
         completed = []
         for use_case_num in self.use_cases.keys():
             use_case_dir = data_dir / f"use_case_{use_case_num}"
             
-            # Check if directory exists and has any files starting with "solution"
+            # Check if directory exists and has the target file
             if use_case_dir.exists():
-                solution_files = list(use_case_dir.glob("solution*"))
-                if solution_files:
+                use_case = self.use_cases[use_case_num]
+                target_file_path = use_case_dir / use_case.target_file
+                
+                # Check for the exact target file
+                if target_file_path.exists():
                     self.use_cases[use_case_num].implementation_exists = True
                     completed.append(use_case_num)
         

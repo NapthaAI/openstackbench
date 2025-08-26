@@ -92,6 +92,11 @@ Implement the use case described above.
 ```
 
 **Environment Setup:** There is a .env file at `{env_path_info}`. It contains important configuration variables, API keys, or settings needed for the library to work properly.
+Always start your main script by loading the environment variables. For example:
+```python
+from dotenv import load_dotenv
+load_dotenv(`{env_path_info}`)
+```
 
 ### Implementation Requirements:
 - Meet all functional requirements listed above

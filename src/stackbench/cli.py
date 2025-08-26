@@ -103,11 +103,16 @@ def cli(ctx):
     help="Comma-separated list of folders to include (e.g., docs,examples,tests)"
 )
 @click.option(
+    "--agent", "-a",
+    default="cursor",
+    help="Agent type (default: cursor)"
+)
+@click.option(
     "--branch", "-b",
     default="main",
     help="Git branch to clone (default: main)"
 )
-def clone(repo_url: str, include_folders: str, branch: str):
+def clone(repo_url: str, include_folders: str, agent: str, branch: str):
     """Clone a repository and set up a new benchmark run."""
     show_logo()
     try:
@@ -120,6 +125,10 @@ def clone(repo_url: str, include_folders: str, branch: str):
                 include_folders=parsed_folders,
                 branch=branch
             )
+            
+            # Set the agent type in the context
+            context.config.agent_type = agent
+            context.save()
         
         console.print(f"[bold green]✓[/bold green] Repository cloned successfully!")
         console.print(f"[bold blue]Run ID:[/bold blue] {context.run_id}")
@@ -137,6 +146,376 @@ def clone(repo_url: str, include_folders: str, branch: str):
         
     except Exception as e:
         console.print(f"[bold red]✗[/bold red] Failed to clone repository: {e}")
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("repo_url")
+@click.option(
+    "--include-folders", "-i",
+    default="", 
+    help="Comma-separated list of folders to include (e.g., docs,examples,tests)"
+)
+@click.option(
+    "--agent", "-a",
+    default="cursor",
+    help="Agent type for IDE execution (default: cursor)"
+)
+@click.option(
+    "--branch", "-b",
+    default="main",
+    help="Git branch to clone (default: main)"
+)
+def setup(repo_url: str, include_folders: str, agent: str, branch: str):
+    """Set up a new benchmark run for IDE agents (clone + extract + ready for manual execution)."""
+    show_logo()
+    console.print(f"[bold blue]Setting up IDE workflow for {agent.title()}[/bold blue]")
+    console.print(f"Repository: [cyan]{repo_url}[/cyan]")
+    if include_folders:
+        console.print(f"Include folders: [dim]{include_folders}[/dim]")
+    console.print()
+    
+    try:
+        # Step 1: Clone repository
+        with console.status("[bold green]Cloning repository..."):
+            repo_manager = RepositoryManager()
+            parsed_folders = parse_include_folders(include_folders)
+            
+            context = repo_manager.clone_repository(
+                repo_url=repo_url,
+                include_folders=parsed_folders,
+                branch=branch
+            )
+            
+            # Set the agent type in the context
+            context.config.agent_type = agent
+            context.save()
+        
+        console.print(f"[bold green]✓[/bold green] Repository cloned successfully!")
+        console.print(f"[bold blue]Run ID:[/bold blue] {context.run_id}")
+        console.print()
+        
+        # Step 2: Extract use cases
+        with console.status("[bold green]Setting up DSPy and analyzing documents..."):
+            try:
+                result = extract_use_cases(context)
+            except Exception as e:
+                console.print(f"[bold red]✗[/bold red] Extraction failed: {e}")
+                context.add_error(f"Extraction failed: {str(e)}")
+                sys.exit(1)
+        
+        # Mark extraction as completed with use cases
+        context.mark_extraction_completed(result.final_use_cases)
+        
+        console.print(f"[bold green]✓[/bold green] Use case extraction completed!")
+        console.print()
+        
+        # Step 3: Show summary and first use case prompt
+        console.print("[bold]Setup Summary:[/bold]")
+        console.print(f"[cyan]• Run ID:[/cyan] {context.run_id}")
+        console.print(f"[cyan]• Agent Type:[/cyan] {agent}")
+        console.print(f"[cyan]• Repository:[/cyan] {context.repo_name}")
+        console.print(f"[cyan]• Use Cases Generated:[/cyan] {len(result.final_use_cases)}")
+        console.print()
+        
+        if result.final_use_cases:
+            console.print("[bold]Generated Use Cases:[/bold]")
+            for i, use_case in enumerate(result.final_use_cases[:3], 1):
+                console.print(f"[green]{i}.[/green] [bold]{use_case.name}[/bold]")
+                console.print(f"   [dim]{use_case.elevator_pitch}[/dim]")
+            
+            if len(result.final_use_cases) > 3:
+                console.print(f"[dim]... and {len(result.final_use_cases) - 3} more use cases[/dim]")
+            console.print()
+        
+        # Step 4: Next steps guidance
+        console.print("[bold]Next Steps - IDE Manual Execution:[/bold]")
+        console.print(f"[yellow]1.[/yellow] Open {agent.title()} IDE in the repository directory")
+        console.print(f"[yellow]2.[/yellow] Get prompts: [cyan]stackbench print-prompt {context.run_id} --use-case 1[/cyan]")
+        console.print(f"[yellow]3.[/yellow] Create solutions in the use case directories")
+        console.print(f"[yellow]4.[/yellow] When done: [cyan]stackbench analyze {context.run_id}[/cyan]")
+        console.print()
+        console.print("[bold cyan]Ready for manual execution![/bold cyan]")
+        
+    except Exception as e:
+        console.print(f"[bold red]✗[/bold red] Setup failed: {e}")
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("repo_url")
+@click.option(
+    "--include-folders", "-i",
+    default="", 
+    help="Comma-separated list of folders to include (e.g., docs,examples,tests)"
+)
+@click.option(
+    "--agent", "-a",
+    required=True,
+    help="CLI agent type for automated execution (e.g., openai, anthropic)"
+)
+@click.option(
+    "--branch", "-b",
+    default="main",
+    help="Git branch to clone (default: main)"
+)
+def run(repo_url: str, include_folders: str, agent: str, branch: str):
+    """Run full automated benchmark pipeline for CLI agents (clone + extract + execute + analyze)."""
+    show_logo()
+    console.print(f"[bold red]✗[/bold red] Automated CLI agents not yet implemented.")
+    console.print()
+    console.print("[bold]Coming Soon:[/bold] Full automation with CLI agents")
+    console.print(f"[dim]• Target agent: {agent}[/dim]")
+    console.print(f"[dim]• Repository: {repo_url}[/dim]")
+    console.print()
+    console.print("[bold]Alternative - Use IDE workflow:[/bold]")
+    console.print(f"[cyan]stackbench setup {repo_url} -a cursor[/cyan]")
+    console.print(f"[cyan]stackbench analyze <run-id>[/cyan]")
+
+
+@cli.command()
+@click.argument("run_id")
+@click.option(
+    "--agent", "-a",
+    required=True,
+    help="CLI agent type for automated execution (e.g., openai, anthropic)"
+)
+def execute(run_id: str, agent: str):
+    """Execute use cases with specified CLI agent (not yet implemented)."""
+    show_logo()
+    console.print(f"[bold red]✗[/bold red] Automated CLI execution not yet implemented.")
+    console.print()
+    console.print("[bold]Coming Soon:[/bold] Automated use case execution")
+    console.print(f"[dim]• Run ID: {run_id}[/dim]")
+    console.print(f"[dim]• Target agent: {agent}[/dim]")
+    console.print()
+    console.print("[bold]Alternative - Use IDE workflow:[/bold]")
+    console.print(f"[cyan]stackbench print-prompt {run_id} --use-case 1[/cyan]")
+    console.print(f"[cyan]# Create solutions manually in IDE[/cyan]")
+    console.print(f"[cyan]stackbench analyze {run_id}[/cyan]")
+
+
+@cli.command()
+@click.argument("run_id")
+def status(run_id: str):
+    """Show detailed status and progress for a benchmark run."""
+    show_logo()
+    try:
+        context = RunContext.load(run_id)
+        
+        # For manual agents, detect any new implementations
+        if context.is_manual_agent():
+            newly_detected = context.detect_and_update_manual_implementations()
+            if newly_detected:
+                console.print(f"[green]Detected {len(newly_detected)} new implementations: {newly_detected}[/green]")
+                console.print()
+        
+        # Header
+        console.print(f"[bold blue]Run Status:[/bold blue] {context.run_id}")
+        console.print(f"Repository: [cyan]{context.repo_name}[/cyan]")
+        console.print(f"Agent Type: [cyan]{context.config.agent_type}[/cyan]")
+        console.print()
+        
+        # Phase progress
+        phase = context.status.phase
+        phase_str = phase.value if hasattr(phase, 'value') else str(phase)
+        phase_color = get_phase_color(phase)
+        console.print(f"[bold]Current Phase:[/bold] [{phase_color}]{phase_str}[/{phase_color}]")
+        
+        # Phase timeline
+        console.print("[bold]Phase Timeline:[/bold]")
+        phases_info = [
+            ("created", True),
+            ("cloned", context.status.clone_completed),
+            ("extracted", context.status.extraction_completed),
+            ("execution", context.status.execution_phase_completed),
+            ("analysis_individual", context.status.individual_analysis_completed),
+            ("analysis_overall", context.status.overall_analysis_completed),
+        ]
+        
+        for phase_name, completed in phases_info:
+            if completed:
+                console.print(f"  [green]✓[/green] {phase_name}")
+            elif phase_name == phase_str:
+                console.print(f"  [yellow]▶[/yellow] {phase_name} [dim](in progress)[/dim]")
+            else:
+                console.print(f"  [dim]○ {phase_name}[/dim]")
+        
+        console.print()
+        
+        # Use case progress
+        if context.status.total_use_cases > 0:
+            console.print("[bold]Use Case Progress:[/bold]")
+            console.print(f"Total: [cyan]{context.status.total_use_cases}[/cyan]")
+            console.print(f"Executed: [cyan]{context.status.executed_count}[/cyan]")
+            console.print(f"Analyzed: [cyan]{context.status.analyzed_count}[/cyan]")
+            console.print()
+            
+            # Individual use case status
+            console.print("[bold]Individual Use Cases:[/bold]")
+            for num, uc in context.status.use_cases.items():
+                exec_status = "✓" if uc.is_executed else "○"
+                exec_color = "green" if uc.is_executed else "dim"
+                
+                anal_status = "✓" if uc.is_analyzed else "○"
+                anal_color = "green" if uc.is_analyzed else "dim"
+                
+                console.print(f"  [{exec_color}]{exec_status}[/{exec_color}] [{anal_color}]{anal_status}[/{anal_color}] Use Case {num}: [cyan]{uc.name}[/cyan]")
+                
+                if uc.execution_error:
+                    console.print(f"     [red]Error: {uc.execution_error}[/red]")
+                if uc.analysis_error:
+                    console.print(f"     [red]Analysis Error: {uc.analysis_error}[/red]")
+        
+        console.print()
+        
+        # Errors
+        if context.status.errors:
+            console.print("[bold red]Errors:[/bold red]")
+            for error in context.status.errors[-5:]:  # Show last 5 errors
+                console.print(f"  [red]• {error}[/red]")
+            if len(context.status.errors) > 5:
+                console.print(f"  [dim]... and {len(context.status.errors) - 5} more errors[/dim]")
+            console.print()
+        
+        # Next steps
+        console.print("[bold]Suggested Next Steps:[/bold]")
+        if phase_str == "cloned":
+            console.print(f"[yellow]•[/yellow] Run: [cyan]stackbench extract {run_id}[/cyan]")
+        elif phase_str == "extracted":
+            if context.is_manual_agent():
+                console.print(f"[yellow]•[/yellow] Get prompts: [cyan]stackbench print-prompt {run_id} --use-case 1[/cyan]")
+                console.print(f"[yellow]•[/yellow] Create solutions manually in IDE")
+                console.print(f"[yellow]•[/yellow] Analyze: [cyan]stackbench analyze {run_id}[/cyan]")
+            else:
+                console.print(f"[yellow]•[/yellow] Execute: [cyan]stackbench execute {run_id} --agent <agent>[/cyan]")
+        elif phase_str == "execution":
+            console.print(f"[yellow]•[/yellow] Analyze: [cyan]stackbench analyze {run_id}[/cyan]")
+        elif phase_str == "analysis_individual":
+            console.print(f"[yellow]•[/yellow] Generate overall report: [cyan]stackbench analyze {run_id}[/cyan]")
+        elif phase_str == "completed":
+            console.print("[green]•[/green] Benchmark complete! Check results.json and results.md")
+        
+    except FileNotFoundError:
+        console.print(f"[bold red]✗[/bold red] Run ID '{run_id}' not found.")
+        console.print("[dim]Use 'stackbench list' to see available runs.[/dim]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[bold red]✗[/bold red] Failed to get status: {e}")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option(
+    "--older-than", "-o",
+    type=int,
+    default=30,
+    help="Remove runs older than N days (default: 30)"
+)
+@click.option(
+    "--dry-run", "-n",
+    is_flag=True,
+    help="Show what would be deleted without actually deleting"
+)
+@click.confirmation_option(
+    prompt="Are you sure you want to delete old benchmark runs?"
+)
+def clean(older_than: int, dry_run: bool):
+    """Clean up old benchmark runs."""
+    import shutil
+    from datetime import timedelta
+    
+    show_logo()
+    console.print(f"[bold blue]Cleaning benchmark runs older than {older_than} days[/bold blue]")
+    console.print()
+    
+    try:
+        config = get_config()
+        data_dir = config.data_dir
+        
+        if not data_dir.exists():
+            console.print("[yellow]No data directory found - nothing to clean.[/yellow]")
+            return
+        
+        # Find all valid run directories
+        cutoff_date = datetime.now() - timedelta(days=older_than)
+        runs_to_delete = []
+        total_size = 0
+        
+        for item in data_dir.iterdir():
+            if (item.is_dir() and 
+                len(item.name) == 36 and  # UUID length
+                (item / "run_context.json").exists()):
+                try:
+                    uuid.UUID(item.name)
+                    
+                    # Check creation time
+                    context_file = item / "run_context.json"
+                    creation_time = datetime.fromtimestamp(context_file.stat().st_mtime)
+                    
+                    if creation_time < cutoff_date:
+                        # Calculate directory size
+                        dir_size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
+                        total_size += dir_size
+                        
+                        # Load context for better info
+                        try:
+                            context = RunContext.load(item.name)
+                            runs_to_delete.append((item, context, creation_time, dir_size))
+                        except:
+                            # If we can't load context, still include it for deletion
+                            runs_to_delete.append((item, None, creation_time, dir_size))
+                            
+                except ValueError:
+                    continue
+        
+        if not runs_to_delete:
+            console.print(f"[green]No runs older than {older_than} days found.[/green]")
+            return
+        
+        # Format size
+        def format_size(size_bytes):
+            if size_bytes < 1024:
+                return f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                return f"{size_bytes / 1024:.1f} KB"
+            else:
+                return f"{size_bytes / (1024 * 1024):.1f} MB"
+        
+        # Show what will be deleted
+        console.print(f"[bold]Found {len(runs_to_delete)} runs to delete:[/bold]")
+        console.print()
+        
+        for item, context, creation_time, dir_size in runs_to_delete:
+            run_id = item.name[:8] + "..."  # Show first 8 chars
+            repo_name = context.repo_name if context else "Unknown"
+            age_days = (datetime.now() - creation_time).days
+            
+            console.print(f"• [dim]{run_id}[/dim] [cyan]{repo_name}[/cyan] "
+                         f"[dim]({age_days} days old, {format_size(dir_size)})[/dim]")
+        
+        console.print()
+        console.print(f"[bold]Total space to free:[/bold] {format_size(total_size)}")
+        console.print()
+        
+        if dry_run:
+            console.print("[yellow]Dry run - no files were deleted.[/yellow]")
+            return
+        
+        # Delete runs
+        deleted_count = 0
+        for item, context, creation_time, dir_size in runs_to_delete:
+            try:
+                shutil.rmtree(item)
+                deleted_count += 1
+            except Exception as e:
+                console.print(f"[red]Failed to delete {item.name}: {e}[/red]")
+        
+        console.print(f"[bold green]✓[/bold green] Deleted {deleted_count} benchmark runs")
+        console.print(f"[green]Freed {format_size(total_size)} of disk space[/green]")
+        
+    except Exception as e:
+        console.print(f"[bold red]✗[/bold red] Failed to clean runs: {e}")
         sys.exit(1)
 
 
