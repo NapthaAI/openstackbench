@@ -27,7 +27,7 @@ def find_markdown_files(repo_path: Path, include_folders: List[str] = None) -> L
     return md_files
 
 
-def count_tokens(content: str, model: str = "gpt-4o-mini") -> int:
+def count_tokens(content: str, model: str = "gpt-5") -> int:
     """Count tokens in content using tiktoken."""
     try:
         encoding = tiktoken.encoding_for_model(model)
@@ -37,7 +37,7 @@ def count_tokens(content: str, model: str = "gpt-4o-mini") -> int:
         return len(content) // 4
 
 
-def truncate_content(content: str, max_tokens: int = 8000, model: str = "gpt-4o-mini") -> str:
+def truncate_content(content: str, max_tokens: int = 8000, model: str = "gpt-5") -> str:
     """Truncate content to maximum token count."""
     try:
         encoding = tiktoken.encoding_for_model(model)
@@ -54,7 +54,7 @@ def truncate_content(content: str, max_tokens: int = 8000, model: str = "gpt-4o-
         return content[:max_chars] if len(content) > max_chars else content
 
 
-def load_documents(markdown_files: List[Path]) -> List[Document]:
+def load_documents(markdown_files: List[Path], max_tokens: int = 10000, model: str = "gpt-5") -> List[Document]:
     """Load markdown files into Document objects with token counting."""
     documents = []
     
@@ -67,8 +67,15 @@ def load_documents(markdown_files: List[Path]) -> List[Document]:
             if not content.strip():
                 continue
                 
-            num_tokens = count_tokens(content)
-            truncated_content = truncate_content(content)
+            num_tokens = count_tokens(
+                content=content, 
+                model=model,
+            )
+            truncated_content = truncate_content(
+                content=content, 
+                max_tokens=max_tokens, 
+                model=model
+            )
             
             document = Document(
                 file_path=file_path,

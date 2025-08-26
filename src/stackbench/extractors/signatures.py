@@ -15,7 +15,7 @@ class DocumentAnalyzer(dspy.Signature):
         description="Whether this document contains practical examples or use cases that can be implemented"
     )
     summary: str = dspy.OutputField(
-        description="Brief 2-sentence summary of what the document covers"
+        description="Brief 5-sentence summary of what the document covers"
     )
 
 

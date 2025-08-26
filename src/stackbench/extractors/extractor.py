@@ -89,7 +89,11 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
     
     # Load documents
     print("Loading documents...")
-    documents = load_documents(md_files)
+    documents = load_documents(
+        markdown_files=md_files,
+        max_tokens=config.MAX_DOC_TOKENS,
+        model=config.dspy_model
+    )
     
     if not documents:
         return ExtractionResult(

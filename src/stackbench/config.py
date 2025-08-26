@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
-
+from dotenv import load_dotenv
 
 class Config(BaseSettings):
     """Configuration class with hierarchical loading support via Pydantic."""
@@ -14,19 +14,18 @@ class Config(BaseSettings):
     # Core directories
     data_dir: Path = Field(default=Path("data"))
     
-    # DSPy settings (essential for extraction)
-    dspy_model: str = "gpt-4o-mini"
+    # Extraction settings
+    dspy_model: str = "gpt-5"
     dspy_cache: bool = True
     dspy_max_tokens: int = 10000
-    
-    # Extraction settings
+    MAX_DOC_TOKENS: int = 10000
     num_use_cases: int = 5
     use_case_max_workers: int = 4
     include_folders: List[str] = Field(default=[])
     
     # Agent settings
     default_agent: str = "cursor"
-    env_file_path: str = ".env"  # Path to environment file relative to repository root
+    env_file_path: str = ".env" 
     
     # Claude Code analysis settings
     anthropic_api_key: Optional[str] = None
@@ -47,7 +46,7 @@ class Config(BaseSettings):
     
     model_config = ConfigDict(
         env_file_encoding="utf-8",
-        extra="ignore"  # Allow extra fields like API keys
+        extra="ignore" 
     )
 
 
@@ -84,22 +83,8 @@ def get_config() -> Config:
         env_file = find_env_file()
         
         if env_file:
-            print(f"Loading environment from: {env_file}")
-            # Load using python-dotenv for better compatibility
-            try:
-                from dotenv import load_dotenv
-                load_dotenv(env_file)
-            except ImportError:
-                # Fall back to manual loading if python-dotenv is not available
-                try:
-                    with open(env_file, 'r') as f:
-                        for line in f:
-                            line = line.strip()
-                            if line and not line.startswith('#') and '=' in line:
-                                key, value = line.split('=', 1)
-                                os.environ[key.strip()] = value.strip()
-                except Exception as e:
-                    print(f"Warning: Could not load environment file {env_file}: {e}")
+            load_dotenv(env_file)
+            print(f"Loaded environment from: {env_file}")
         else:
             print("No .env file found, using environment variables and defaults")
         

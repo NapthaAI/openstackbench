@@ -68,7 +68,7 @@ class CursorIDEAgent(Agent):
 
 ## Instructions
 
-Please implement the use case described above.
+Implement the use case described above.
 
 **Documentation Location:** The repository documentation is located at `{relative_repo_dir}`.
 
@@ -91,7 +91,7 @@ Please implement the use case described above.
 # - Handled edge cases based on API documentation
 ```
 
-**Environment Setup:** Check for and load any environment file at `{env_path_info}` if it exists. This may contain important configuration variables, API keys, or settings needed for the library to work properly.
+**Environment Setup:** There is a .env file at `{env_path_info}`. It contains important configuration variables, API keys, or settings needed for the library to work properly.
 
 ### Implementation Requirements:
 - Meet all functional requirements listed above

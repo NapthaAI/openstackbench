@@ -71,8 +71,7 @@ stackbench/
 │   │   └── repository.py         # Git operations and repo management
 │   ├── agents/
 │   │   ├── base.py              # Abstract agent interface
-│   │   ├── openai_agent.py      # OpenAI API integration
-│   │   └── cursor_agent.py      # Cursor IDE workflows
+│   │   └── cursor_ide.py        # Cursor IDE workflows
 │   ├── extractors/
 │   │   ├── models.py            # Pydantic models for extraction
 │   │   ├── signatures.py        # DSPy signatures
@@ -80,7 +79,9 @@ stackbench/
 │   │   ├── extractor.py         # Main extraction logic
 │   │   └── utils.py             # Token counting utilities
 │   └── analyzers/
-│       └── dspy_analyzer.py     # DSPy-powered performance analysis
+│       ├── individual_analyzer.py  # Individual use case analysis
+│       ├── overall_analyzer.py     # Overall analysis report generation
+│       └── models.py               # Analysis data models
 ├── tests/                       # Test files
 ├── data/                        # Benchmark run data (git ignored)
 ├── examples/                    # Example benchmark configs
@@ -103,39 +104,6 @@ stackbench/
 - Use rich for CLI interfaces
 - Use dspy for AI-powered components
 
-### Testing Guidelines
-
-- **Write tests for all core functionality** using pytest
-- **Use fixtures** for setup/teardown (temp directories, mocked dependencies)
-- **Mock external dependencies** (git operations, API calls, file system when appropriate)
-- **Test error scenarios** not just happy paths
-- **Use descriptive test names** that explain what is being tested
-- **Group related tests** in classes (e.g., `TestRunContext`, `TestRepositoryManager`)
-- **Test isolation** - each test should run independently
-- **Coverage focus** - prioritize testing business logic and error handling over simple getters/setters
-
-### Test Structure
-```python
-@pytest.fixture
-def temp_data_dir():
-    """Create temporary directory for test isolation."""
-    temp_dir = Path(tempfile.mkdtemp())
-    yield temp_dir
-    shutil.rmtree(temp_dir)
-
-class TestClassName:
-    def test_specific_functionality(self, fixtures):
-        """Test description explaining what is verified."""
-        # Arrange, Act, Assert pattern
-```
-
-### Running Tests
-```bash
-uv run pytest tests/                    # Run all tests
-uv run pytest tests/test_file.py -v     # Run specific file with verbose output
-uv run pytest -k "test_name" -v        # Run specific test
-```
-
 ## Architecture
 
 ### Run Structure
@@ -145,13 +113,14 @@ Each benchmark run creates a unique folder in `./data/<uuid>/`:
 ├── repo/                    # Cloned repository 
 ├── data/
 │   ├── use_cases.json      # Generated use cases
-│   ├── results.json        # Structured execution results
 │   └── use_case_1/         # Individual execution
 │       ├── solution.py     # Generated solution
 │       ├── output.txt      # Execution output
 │       └── errors.txt      # Error logs
 ├── run_context.json        # Complete run state
+└── results.json            # Generated analysis report
 └── results.md              # Generated analysis report
+
 ```
 
 ### Run Context & Configuration
@@ -203,13 +172,49 @@ stackbench clean                                  # Clean up old runs
 
 ### Run State Management
 
-Runs progress through phases: `created` → `cloned` → `extracted` → `executed` → `analyzed`
+Runs progress through seven distinct phases: `created` → `cloned` → `extracted` → `execution` → `analysis_individual` → `analysis_overall` → `completed`
 
-Each phase completion is tracked with:
-- Timestamps and completion flags
-- Execution counts and success rates  
+#### Phase Descriptions
+
+Each phase represents **completed** work, not work in progress:
+
+- **`created`**: Initial run context established with UUID and directory structure
+- **`cloned`**: Repository successfully cloned to local workspace
+- **`extracted`**: Use cases generated and saved to `use_cases.json`
+- **`execution`**: All use cases executed (either via CLI automation or IDE manual completion)
+- **`analysis_individual`**: Individual analysis completed for all executed use cases
+- **`analysis_overall`**: Overall analysis report (`results.json` + `results.md`) generated
+- **`completed`**: Full benchmark run finished
+
+#### Granular State Tracking
+
+Each phase completion is tracked with comprehensive state management:
+
+**Run-Level Tracking:**
+- Phase progression with automatic transitions based on completion criteria
+- Timestamps for creation and last update
+- Boolean completion flags for each major phase
 - Error logs with timestamps
-- Automatic state persistence
+- Automatic state persistence to `run_context.json`
+
+**Use Case-Level Tracking:**
+Each individual use case maintains detailed state:
+- **Execution Status**: `not_executed`, `executed`, `failed`, `skipped`
+- **Analysis Status**: `not_analyzed`, `analyzed`, `failed`  
+- **Execution Method**: `ide_manual` (human-driven) or `cli_automated`
+- **File Tracking**: Implementation and analysis file existence validation
+- **Timestamps**: Execution and analysis completion times
+- **Error Tracking**: Specific errors per use case with timestamps
+
+#### Automatic Phase Progression
+
+The system automatically advances phases when completion criteria are met:
+- **To `execution`**: When all use cases are executed (success or failure)
+- **To `analysis_individual`**: When all executable use cases have been analyzed
+- **To `analysis_overall`**: When individual analyses are complete and overall report is generated
+- **To `completed`**: When all work is finished
+
+This enables both automated CLI workflows and manual IDE workflows to progress through the same structured state management system.
 
 ## Analysis & Results Output
 
