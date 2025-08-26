@@ -146,28 +146,27 @@ Each run maintains comprehensive state in `RunContext`:
 
 ### CLI Workflows
 
-**Full Pipeline (CLI agents):**
+**Streamlined IDE Workflow:**
 ```bash
-stackbench run <repo-url> --agent <cli-agent>  # Complete automation
+stackbench setup <repo-url> -i <folders> -a <agent> -b <branch>  # Clone + extract + ready for manual execution
+stackbench analyze <run-id>                                       # Process results after manual implementation
 ```
 
-**Manual Pipeline (IDE agents):**
+**Streamlined CLI Workflow (Coming Soon):**
 ```bash
-stackbench init <repo-url> --agent cursor     # Clone + extract + setup
-# Manual execution in IDE (copy prompts, create files in use_case_X/ dirs)
-stackbench analyze <run-id>                   # Process results
+stackbench run <repo-url> -i <folders> -a <agent> -b <branch>    # Full automation (not yet implemented)
 ```
 
 **Individual Steps:**
 ```bash
-stackbench clone <repo-url>                       # Clone repository (returns run-id)
-stackbench extract <run-id>                       # Generate use cases
-stackbench print-prompt <run-id> --use-case <n>   # Print specific use case prompt for manual execution
-stackbench execute <run-id> --agent <agent>       # Execute with agent
-stackbench analyze <run-id>                       # Generate analysis
-stackbench status <run-id>                        # Check run status
-stackbench list                                   # List all runs
-stackbench clean                                  # Clean up old runs
+stackbench clone <repo-url> -i <folders> -a <agent> -b <branch>  # Clone repository (returns run-id)
+stackbench extract <run-id>                                      # Generate use cases
+stackbench print-prompt <run-id> --use-case <n>                  # Print specific use case prompt for manual execution
+stackbench execute <run-id> --agent <agent>                      # Execute with agent (not yet implemented)
+stackbench analyze <run-id>                                      # Generate analysis
+stackbench status <run-id>                                       # Check run status
+stackbench list                                                  # List all runs
+stackbench clean --older-than <days>                            # Clean up old runs
 ```
 
 ### Run State Management
@@ -260,7 +259,9 @@ StackBench generates dual output formats for each analysis:
 
 **1. Environment Setup (Automated)**
 ```bash
-stackbench clone <repo-url>                         # Clone repository and get run-id
+stackbench setup <repo-url> -a cursor               # Clone + extract in one command (recommended)
+# OR step-by-step:
+stackbench clone <repo-url> -a cursor               # Clone repository and get run-id
 stackbench extract <run-id>                         # Generate use cases
 stackbench print-prompt <run-id> --use-case 1       # Print first use case prompt
 ```
