@@ -27,14 +27,7 @@
             {
               "type": "command",
               "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/analyst_json_validator.py"
-            }
-          ]
-        }
-      ],
-      "AfterResponse": [
-        {
-          "matcher": "*",
-          "hooks": [
+            },
             {
               "type": "command",
               "command": "python3 $CLAUDE_PROJECT_DIR/.claude/after_response.py"

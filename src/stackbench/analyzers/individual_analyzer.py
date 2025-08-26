@@ -227,7 +227,7 @@ Save your analysis as a JSON file with this structure:
         os.environ['CLAUDE_USE_CASE_ID'] = f"use_case_{use_case_number}"
         os.environ['CLAUDE_OUTPUT_DIR'] = str(use_case_dir.absolute())
         os.environ['CLAUDE_LOGS_DIR'] = str((context.data_dir / "logs").absolute())
-        os.environ['CLAUDE_PROJECT_DIR'] = str(Path.cwd().absolute())  # Use current working directory as project root
+        os.environ['CLAUDE_PROJECT_DIR'] = str(Path.cwd().absolute())
         os.environ['CLAUDE_AGENT'] = 'stackbench_analyzer'
         
         # Ensure logs directory exists
@@ -245,7 +245,7 @@ Save your analysis as a JSON file with this structure:
         options = ClaudeCodeOptions(
             system_prompt="You are a documentation analysis expert. Analyze implementations systematically and provide structured JSON output.",
             max_turns=self.config.analysis_max_turns,
-            cwd=str(Path.cwd()),  # Run from StackBench project root where .claude directory is located
+            cwd=str(Path.cwd()), 
             allowed_tools=["Read", "Write", "Bash", "LS", "Grep"]
         )
         

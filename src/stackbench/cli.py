@@ -927,6 +927,12 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
                         
                         if result_paths:
                             console.print("[bold green]✓[/bold green] Overall analysis completed successfully!")
+                            
+                            # Mark overall analysis as completed and update phase
+                            context.status.overall_analysis_completed = True
+                            context.status.update_phase_automatically()
+                            context.save()
+                            
                             console.print()
                             console.print("[bold]Generated Files:[/bold]")
                             console.print(f"• [cyan]results.json[/cyan]: {result_paths['results_json']}")
@@ -1090,6 +1096,12 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
                         
                         if result_paths:
                             console.print("[bold green]✓[/bold green] Overall analysis completed successfully!")
+                            
+                            # Mark overall analysis as completed and update phase
+                            context.status.overall_analysis_completed = True
+                            context.status.update_phase_automatically()
+                            context.save()
+                            
                             console.print()
                             console.print("[bold]Generated Files:[/bold]")
                             console.print(f"• [cyan]results.json[/cyan]: {result_paths['results_json']}")
