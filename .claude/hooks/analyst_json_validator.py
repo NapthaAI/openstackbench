@@ -145,6 +145,12 @@ def validate_file_location(file_path):
 
 def main():
     try:
+        # Only run for StackBench analyzer agent
+        claude_agent = os.environ.get('CLAUDE_AGENT', '')
+        if claude_agent != 'stackbench_analyzer':
+            print(f"⏭️ Skipping validation - not StackBench analyzer (agent: '{claude_agent}')", file=sys.stderr)
+            sys.exit(0)
+        
         print("🔧 STACKBENCH JSON VALIDATOR: Starting validation", file=sys.stderr)
         tool_data = json.load(sys.stdin)
         file_path = tool_data.get('tool_input', {}).get('file_path', '')
