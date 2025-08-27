@@ -66,9 +66,10 @@ cp .env.sample .env
 **Streamlined IDE Workflow (Recommended):**
 ```bash
 # 1. Set up repository for IDE execution (clone + extract in one command)
-stackbench setup https://github.com/user/awesome-lib -a cursor
+stackbench setup https://github.com/user/awesome-lib -a cursor -l javascript
 
 # 2. Execute use cases manually in Cursor IDE
+# ⚠️ Wait for Cursor indexing to complete before implementing!
 stackbench print-prompt <run-id> -u 1 --copy
 # [Implement in Cursor IDE - repeat for all use cases]
 
@@ -85,10 +86,13 @@ stackbench run https://github.com/user/awesome-lib -a claude-code
 **Setup Options:**
 ```bash
 # Focus on specific folders  
-stackbench setup https://github.com/user/awesome-lib -i docs,examples -a cursor
+stackbench setup https://github.com/user/awesome-lib -i docs,examples -a cursor -l python
 
-# Use specific branch
-stackbench setup https://github.com/user/awesome-lib -b develop -a cursor
+# Use specific branch and language
+stackbench setup https://github.com/user/awesome-lib -b develop -a cursor -l typescript
+
+# Language aliases supported: python/py, javascript/js, typescript/ts
+stackbench setup https://github.com/user/react-lib -a cursor -l js
 ```
 
 ## CLI Commands
@@ -99,14 +103,14 @@ stackbench setup https://github.com/user/awesome-lib -b develop -a cursor
 Set up repository for IDE execution (clone + extract use cases).
 
 ```bash
-# Complete IDE setup in one command
-stackbench setup https://github.com/user/awesome-lib -a cursor
+# Complete IDE setup in one command with language specification
+stackbench setup https://github.com/user/awesome-lib -a cursor -l python
 
-# Focus on specific folders
-stackbench setup https://github.com/user/awesome-lib -i docs,examples -a cursor
+# Focus on specific folders with JavaScript library
+stackbench setup https://github.com/user/awesome-lib -i docs,examples -a cursor -l js
 
-# Use specific branch
-stackbench setup https://github.com/user/awesome-lib -b develop -a cursor
+# Use specific branch with TypeScript
+stackbench setup https://github.com/user/awesome-lib -b develop -a cursor -l typescript
 ```
 
 This command:
@@ -131,8 +135,11 @@ stackbench run https://github.com/user/awesome-lib -a claude-code -i docs,exampl
 Clone a repository and set up a new benchmark run.
 
 ```bash
-# Clone with agent specification
-stackbench clone https://github.com/user/awesome-lib -a cursor -i docs,examples -b main
+# Clone with agent specification and language
+stackbench clone https://github.com/user/awesome-lib -a cursor -i docs,examples -l python
+
+# Clone JavaScript library with specific branch
+stackbench clone https://github.com/user/react-lib -a cursor -b develop -l js
 ```
 
 **`stackbench list`**
@@ -264,8 +271,8 @@ stackbench clean --dry-run
 
 **Streamlined IDE Workflow (Recommended)**:
 ```bash
-# One command setup
-stackbench setup https://github.com/user/lib -i docs -a cursor
+# One command setup with language specification
+stackbench setup https://github.com/user/lib -i docs -a cursor -l javascript
 
 # Manual execution in IDE
 stackbench print-prompt <run-id> -u 1 -c # Get formatted prompt + copy to clipboard
@@ -278,7 +285,7 @@ stackbench analyze <run-id>               # Process results when all complete
 
 **Step-by-step Workflow**:
 ```bash
-stackbench clone https://github.com/user/lib -i docs -a cursor
+stackbench clone https://github.com/user/lib -i docs -a cursor -l python
 stackbench extract <run-id>               # Generate use cases
 stackbench print-prompt <run-id> -u 1 -c # Manual execution...
 stackbench analyze <run-id>               # Process results

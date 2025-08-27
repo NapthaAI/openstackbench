@@ -148,25 +148,25 @@ Each run maintains comprehensive state in `RunContext`:
 
 **Streamlined IDE Workflow:**
 ```bash
-stackbench setup <repo-url> -i <folders> -a <agent> -b <branch>  # Clone + extract + ready for manual execution
-stackbench analyze <run-id>                                       # Process results after manual implementation
+stackbench setup <repo-url> -i <folders> -a <agent> -b <branch> -l <language>  # Clone + extract + ready for manual execution
+stackbench analyze <run-id>                                                     # Process results after manual implementation
 ```
 
 **Streamlined CLI Workflow (Coming Soon):**
 ```bash
-stackbench run <repo-url> -i <folders> -a <agent> -b <branch>    # Full automation (not yet implemented)
+stackbench run <repo-url> -i <folders> -a <agent> -b <branch> -l <language>    # Full automation (not yet implemented)
 ```
 
 **Individual Steps:**
 ```bash
-stackbench clone <repo-url> -i <folders> -a <agent> -b <branch>  # Clone repository (returns run-id)
-stackbench extract <run-id>                                      # Generate use cases
-stackbench print-prompt <run-id> --use-case <n>                  # Print specific use case prompt for manual execution
-stackbench execute <run-id> --agent <agent>                      # Execute with agent (not yet implemented)
-stackbench analyze <run-id>                                      # Generate analysis
-stackbench status <run-id>                                       # Check run status
-stackbench list                                                  # List all runs
-stackbench clean --older-than <days>                            # Clean up old runs
+stackbench clone <repo-url> -i <folders> -a <agent> -b <branch> -l <language>  # Clone repository (returns run-id)
+stackbench extract <run-id>                                                    # Generate use cases
+stackbench print-prompt <run-id> --use-case <n>                                # Print specific use case prompt for manual execution
+stackbench execute <run-id> --agent <agent>                                    # Execute with agent (not yet implemented)
+stackbench analyze <run-id>                                                    # Generate analysis
+stackbench status <run-id>                                                     # Check run status
+stackbench list                                                                # List all runs
+stackbench clean --older-than <days>                                          # Clean up old runs
 ```
 
 ### Run State Management
@@ -259,11 +259,11 @@ StackBench generates dual output formats for each analysis:
 
 **1. Environment Setup (Automated)**
 ```bash
-stackbench setup <repo-url> -a cursor               # Clone + extract in one command (recommended)
+stackbench setup <repo-url> -a cursor -l javascript               # Clone + extract in one command (recommended)
 # OR step-by-step:
-stackbench clone <repo-url> -a cursor               # Clone repository and get run-id
-stackbench extract <run-id>                         # Generate use cases
-stackbench print-prompt <run-id> --use-case 1       # Print first use case prompt
+stackbench clone <repo-url> -a cursor -l python                   # Clone repository and get run-id
+stackbench extract <run-id>                                       # Generate use cases
+stackbench print-prompt <run-id> --use-case 1                     # Print first use case prompt
 ```
 
 **2. Manual IDE Interaction (Human-Driven)**
