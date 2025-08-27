@@ -23,16 +23,9 @@ class CursorIDEAgent(Agent):
         context = self.get_run_context(run_id)
         target_dir = self.get_target_directory(run_id, use_case_number)
         
-        # Get relative paths for cleaner display
-        try:
-            relative_target_dir = target_dir.relative_to(Path.cwd())
-        except ValueError:
-            relative_target_dir = target_dir
-            
-        try:
-            relative_repo_dir = context.repo_dir.relative_to(Path.cwd())
-        except ValueError:
-            relative_repo_dir = context.repo_dir
+        # Use absolute paths for clarity
+        absolute_target_dir = target_dir.resolve()
+        absolute_repo_dir = context.repo_dir.resolve()
         
         # Get environment file path
         env_file = find_env_file()
@@ -70,13 +63,13 @@ class CursorIDEAgent(Agent):
 
 Implement the use case described above.
 
-**Documentation Location:** The repository documentation is located at `{relative_repo_dir}`.
+**Documentation Location:** The repository documentation is located at `{absolute_repo_dir}`.
 
 **Use Documentation for Help:** Please review and use the documentation in the repository to help you understand the library's APIs, patterns, and best practices.
 
 **File Creation:** Create a single entry file called `{use_case.target_file}` (solution.py or solution.js depending on the library language).
 
-**Target Directory:** Create the directory `{relative_target_dir}` if it doesn't exist. All files that you decide to create should be placed in this directory.
+**Target Directory:** Create the directory `{absolute_target_dir}` if it doesn't exist. All files that you decide to create should be placed in this directory.
 
 **Documentation Tracking:** At the top of your solution file, include a comment block documenting which files you consulted:
 ```python
@@ -109,9 +102,9 @@ load_dotenv(`{env_path_info}`)
 - Consider edge cases and error scenarios
 
 ---
-**Repository Path:** `{relative_repo_dir}`
-**Target Directory:** `{relative_target_dir}`
-**Main File:** `{relative_target_dir}/{use_case.target_file}`
+**Repository Path:** `{absolute_repo_dir}`
+**Target Directory:** `{absolute_target_dir}`
+**Main File:** `{absolute_target_dir}/{use_case.target_file}`
 """
         
         return prompt

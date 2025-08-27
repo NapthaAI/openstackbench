@@ -346,7 +346,7 @@ Create a comprehensive analysis report as `results.md` following this structure:
 ```
 
 **Important Requirements:**
-1. Save the analysis report to `results.md` in the run directory: {str(context.run_dir / "results.md")}
+1. Save the analysis report to `results.md` in the run directory: {str(context.run_dir.resolve() / "results.md")}
 2. Focus on actionable insights that would help library maintainers improve AI agent compatibility
 3. Use specific examples from the results data to support your analysis
 4. Keep the tone professional and constructive

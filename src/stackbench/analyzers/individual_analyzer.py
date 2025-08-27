@@ -90,16 +90,9 @@ class IndividualAnalyzer:
     ) -> str:
         """Create comprehensive analysis prompt for Claude Code."""
         
-        # Get relative paths for cleaner display
-        try:
-            relative_repo_dir = context.repo_dir.relative_to(Path.cwd())
-        except ValueError:
-            relative_repo_dir = context.repo_dir
-            
-        try:
-            relative_target_file = target_file_path.relative_to(Path.cwd())
-        except ValueError:
-            relative_target_file = target_file_path
+        # Use absolute paths for clarity
+        absolute_repo_dir = context.repo_dir.resolve()
+        absolute_target_file = target_file_path.resolve()
         
         # Get environment file path
         env_file = find_env_file()
@@ -135,14 +128,14 @@ Analyze the implementation to assess documentation quality and provide structure
 **Architecture Pattern:** {use_case.architecture_pattern}
 
 ## Implementation to Analyze
-**Repository Path:** `{relative_repo_dir}`
-**Implementation File:** `{relative_target_file}`
+**Repository Path:** `{absolute_repo_dir}`
+**Implementation File:** `{absolute_target_file}`
 **{env_file_info}**
 
 ## Analysis Process
 
 ### Step 1: Read Main Implementation File ONLY
-**CRITICAL:** Focus ONLY on the main implementation file: `{relative_target_file}`
+**CRITICAL:** Focus ONLY on the main implementation file: `{absolute_target_file}`
 - Do NOT read or analyze other files in the repository
 - Do NOT explore the codebase beyond this single file
 - Look for documentation tracking comments at the top
@@ -181,7 +174,7 @@ Save your analysis as a JSON file with this structure:
 {UseCaseAnalysisResult.generate_json_example()}
 ```
 
-**Save the analysis to:** `{target_file_path.parent.absolute()}/use_case_{use_case_number}_analysis.json`
+**Save the analysis to:** `{target_file_path.parent.resolve()}/use_case_{use_case_number}_analysis.json`
 """
         return prompt
     
