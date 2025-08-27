@@ -92,6 +92,7 @@ class RunConfig(BaseModel):
     # Repository settings
     repo_url: str
     include_folders: List[str] = Field(default_factory=list)
+    language: Optional[str] = None  # Programming language of the repository
     
     # Extraction settings
     num_use_cases: int = Field(default_factory=lambda: get_config().num_use_cases)
@@ -303,6 +304,7 @@ class RunContext(BaseModel):
         agent_type: Optional[str] = None,
         include_folders: Optional[List[str]] = None,
         num_use_cases: Optional[int] = None,
+        language: Optional[str] = None,
         base_data_dir: Optional[Path] = None
     ) -> "RunContext":
         """Create a new run context with directory structure."""
@@ -320,6 +322,7 @@ class RunContext(BaseModel):
         run_config = RunConfig(
             repo_url=repo_url,
             include_folders=include_folders or [],
+            language=language,
             agent_type=agent_type or app_config.default_agent,
             num_use_cases=num_use_cases or app_config.num_use_cases
         )

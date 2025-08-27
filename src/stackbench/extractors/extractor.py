@@ -37,10 +37,10 @@ def setup_dspy():
     dspy.configure(lm=lm)
 
 
-def process_single_document(document: Document) -> List[UseCase]:
+def process_single_document(document: Document, language: str = "python") -> List[UseCase]:
     """Process a single document and return validated use cases."""
     processor = DocumentProcessor()
-    return processor.process_document(document)
+    return processor.process_document(document, language=language)
 
 
 def get_relative_path(file_path, repo_dir):
@@ -110,6 +110,9 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
     
     print(f"Loaded {len(documents)} documents, processing with target of {context.config.num_use_cases} use cases...")
     
+    # Get language from context config (defaults to "python" if not specified)
+    language = context.config.language or "python"
+    
     # Process documents in parallel with early stopping
     all_use_cases = []
     documents_with_use_cases = 0
@@ -124,7 +127,7 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
         batch_size = max_workers * 2  # Keep pipeline full
         
         for doc in documents[:batch_size]:
-            future = executor.submit(process_single_document, doc)
+            future = executor.submit(process_single_document, doc, language)
             future_to_doc[future] = doc
         
         doc_index = batch_size
@@ -164,7 +167,7 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
             # Submit next document if available
             if doc_index < len(documents):
                 next_doc = documents[doc_index]
-                new_future = executor.submit(process_single_document, next_doc)
+                new_future = executor.submit(process_single_document, next_doc, language)
                 future_to_doc[new_future] = next_doc
                 doc_index += 1
     

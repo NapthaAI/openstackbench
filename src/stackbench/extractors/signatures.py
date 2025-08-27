@@ -24,9 +24,10 @@ class UseCaseExtractor(dspy.Signature):
     
     content: str = dspy.InputField(description="Content of the documentation file")
     source_file: str = dspy.InputField(description="Path of the source documentation file")
+    language: str = dspy.InputField(description="Programming language of the repository (e.g., 'python', 'javascript', 'typescript')")
     
     use_cases: List[UseCase] = dspy.OutputField(
-        description="List of actionable use cases extracted from the documentation. Focus on practical examples that can be implemented by a coding agent."
+        description="List of actionable use cases extracted from the documentation. Focus on practical examples that can be implemented by a coding agent. For each use case, determine an appropriate target_file name with the correct file extension based on the repository language."
     )
 
 

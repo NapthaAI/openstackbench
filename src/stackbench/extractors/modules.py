@@ -24,24 +24,31 @@ class DocumentProcessor(dspy.Module):
             print(f"Error analyzing {document.file_path}: {e}")
             return False, f"Analysis failed: {e}"
     
-    def extract_use_cases(self, document: Document) -> List[UseCase]:
+    def extract_use_cases(self, document: Document, language: str = "python") -> List[UseCase]:
         """Extract use cases from a document."""
         try:
             result = self.extractor(
                 content=document.truncated_content,
-                source_file=str(document.file_path)
+                source_file=str(document.file_path),
+                language=language
             )
             
-            # Ensure use cases have proper source_document and generate target_file
+            # Ensure use cases have proper source_document
             use_cases = []
-            for i, use_case in enumerate(result.use_cases, 1):
+            for use_case in result.use_cases:
                 # Set source_document if not already set
                 if not use_case.source_document:
                     use_case.source_document = [str(document.file_path)]
                 
-                # Generate target_file if not set
+                # DSPy should have determined target_file based on language context
+                # If still not set, provide a basic fallback with appropriate extension
                 if not use_case.target_file:
-                    use_case.target_file = f"use_case_{i}/solution.py"
+                    ext = {
+                        'python': 'py',
+                        'javascript': 'js', 
+                        'typescript': 'ts',
+                    }.get(language, 'py')
+                    use_case.target_file = f"solution.{ext}"
                 
                 use_cases.append(use_case)
             
@@ -75,7 +82,7 @@ class DocumentProcessor(dspy.Module):
         except Exception as e:
             return False, f"Validation error: {e}"
     
-    def process_document(self, document: Document) -> List[UseCase]:
+    def process_document(self, document: Document, language: str = "python") -> List[UseCase]:
         """Full pipeline: analyze, extract, and validate use cases from a document."""
         # Step 1: Analyze if document has use cases
         has_use_cases, summary = self.analyze_document(document)
@@ -83,8 +90,8 @@ class DocumentProcessor(dspy.Module):
         if not has_use_cases:
             return []
         
-        # Step 2: Extract use cases
-        raw_use_cases = self.extract_use_cases(document)
+        # Step 2: Extract use cases with language context
+        raw_use_cases = self.extract_use_cases(document, language=language)
         
         if not raw_use_cases:
             return []

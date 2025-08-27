@@ -45,6 +45,26 @@ def parse_include_folders(include_folders_str: str) -> List[str]:
     return [folder.strip() for folder in include_folders_str.split(",") if folder.strip()]
 
 
+def normalize_language(language: Optional[str]) -> Optional[str]:
+    """Normalize language parameter to standard form."""
+    if not language:
+        return None
+    
+    language = language.lower().strip()
+    
+    # Language aliases
+    language_map = {
+        'py': 'python',
+        'python': 'python',
+        'js': 'javascript',
+        'javascript': 'javascript',
+        'ts': 'typescript',
+        'typescript': 'typescript'
+    }
+    
+    return language_map.get(language, language)
+
+
 def get_phase_color(phase) -> str:
     """Get color for phase status."""
     # Handle both enum and string values
@@ -112,18 +132,25 @@ def cli(ctx):
     default="main",
     help="Git branch to clone (default: main)"
 )
-def clone(repo_url: str, include_folders: str, agent: str, branch: str):
+@click.option(
+    "--language", "-l",
+    default=None,
+    help="Programming language of the repository (e.g., python/py, javascript/js, typescript/ts)"
+)
+def clone(repo_url: str, include_folders: str, agent: str, branch: str, language: Optional[str]):
     """Clone a repository and set up a new benchmark run."""
     show_logo()
     try:
         with console.status("[bold green]Cloning repository..."):
             repo_manager = RepositoryManager()
             parsed_folders = parse_include_folders(include_folders)
+            normalized_language = normalize_language(language)
             
             context = repo_manager.clone_repository(
                 repo_url=repo_url,
                 include_folders=parsed_folders,
-                branch=branch
+                branch=branch,
+                language=normalized_language
             )
             
             # Set the agent type in the context
@@ -166,7 +193,12 @@ def clone(repo_url: str, include_folders: str, agent: str, branch: str):
     default="main",
     help="Git branch to clone (default: main)"
 )
-def setup(repo_url: str, include_folders: str, agent: str, branch: str):
+@click.option(
+    "--language", "-l",
+    default=None,
+    help="Programming language of the repository (e.g., python/py, javascript/js, typescript/ts)"
+)
+def setup(repo_url: str, include_folders: str, agent: str, branch: str, language: Optional[str]):
     """Set up a new benchmark run for IDE agents (clone + extract + ready for manual execution)."""
     show_logo()
     console.print(f"[bold blue]Setting up IDE workflow for {agent.title()}[/bold blue]")
@@ -180,11 +212,13 @@ def setup(repo_url: str, include_folders: str, agent: str, branch: str):
         with console.status("[bold green]Cloning repository..."):
             repo_manager = RepositoryManager()
             parsed_folders = parse_include_folders(include_folders)
+            normalized_language = normalize_language(language)
             
             context = repo_manager.clone_repository(
                 repo_url=repo_url,
                 include_folders=parsed_folders,
-                branch=branch
+                branch=branch,
+                language=normalized_language
             )
             
             # Set the agent type in the context

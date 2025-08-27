@@ -25,7 +25,8 @@ class RepositoryManager:
         agent_type: Optional[str] = None,
         include_folders: Optional[List[str]] = None,
         num_use_cases: Optional[int] = None,
-        branch: str = "main"
+        branch: str = "main",
+        language: Optional[str] = None
     ) -> RunContext:
         """Clone repository and set up run directory structure.
         
@@ -35,6 +36,7 @@ class RepositoryManager:
             include_folders: Optional list of folders to focus on for extraction
             num_use_cases: Number of use cases to generate
             branch: Git branch to clone (default: main)
+            language: Programming language of the repository (e.g., 'python', 'javascript')
             
         Returns:
             RunContext with cloned repository and directory structure
@@ -45,6 +47,7 @@ class RepositoryManager:
             agent_type=agent_type,
             include_folders=include_folders,
             num_use_cases=num_use_cases,
+            language=language,
             base_data_dir=self.base_data_dir
         )
         context.create_directories()
