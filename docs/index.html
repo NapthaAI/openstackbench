@@ -5,41 +5,188 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StackBench Documentation</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        h1 { color: #2563eb; }
-        a { color: #2563eb; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .nav { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .nav ul { list-style: none; padding: 0; }
-        .nav li { margin: 10px 0; }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+        }
+
+        .title {
+            font-size: 3rem;
+            font-weight: 800;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        .tutorials-grid {
+            display: grid;
+            gap: 1.5rem;
+            margin-bottom: 4rem;
+        }
+
+        .tutorial-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tutorial-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .tutorial-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .tutorial-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+        }
+
+        .tutorial-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .tutorial-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text);
+        }
+
+        .tutorial-desc {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem 0;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        .naptha-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .naptha-link:hover {
+            color: var(--primary-dark);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1.5rem 1rem;
+            }
+            
+            .title {
+                font-size: 2.5rem;
+            }
+            
+            .subtitle {
+                font-size: 1.1rem;
+            }
+        }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-    <h1>StackBench Documentation</h1>
-    
-    <p>Benchmark coding agents on library-specific tasks through local deployment and open source community collaboration.</p>
-    
-    <div class="nav">
-        <h2>Getting Started</h2>
-        <ul>
-            <li><a href="tutorials/0.getting-started.html">🚀 Getting Started</a></li>
-            <li><a href="tutorials/1.how-stackbench-works.html">📚 How StackBench Works</a></li>
-            <li><a href="tutorials/2.cli-commands.html">⚡ CLI Commands</a></li>
-        </ul>
+    <div class="container">
+        <div class="header">
+            <img src="assets/naptha-logo.png" alt="Naptha Logo" class="logo">
+            <h1 class="title">StackBench</h1>
+            <p class="subtitle">Benchmark coding agents on library-specific tasks through local deployment and open source community collaboration</p>
+        </div>
         
-        <h2>Reference</h2>
-        <ul>
-            <li><a href="prd.html">📋 Product Requirements</a></li>
-            <li><a href="tech-spec.html">🔧 Technical Specification</a></li>
-        </ul>
+        <div class="tutorials-grid">
+            <a href="tutorials/0.getting-started.html" class="tutorial-card">
+                <span class="tutorial-icon">🚀</span>
+                <h2 class="tutorial-title">Getting Started</h2>
+                <p class="tutorial-desc">Learn how to install StackBench, set up your environment, and run your first benchmark.</p>
+            </a>
+            
+            <a href="tutorials/1.how-stackbench-works.html" class="tutorial-card">
+                <span class="tutorial-icon">📚</span>
+                <h2 class="tutorial-title">How StackBench Works</h2>
+                <p class="tutorial-desc">Understand the architecture, workflow, and core concepts behind StackBench.</p>
+            </a>
+            
+            <a href="tutorials/2.cli-commands.html" class="tutorial-card">
+                <span class="tutorial-icon">⚡</span>
+                <h2 class="tutorial-title">CLI Commands</h2>
+                <p class="tutorial-desc">Complete reference for all StackBench command-line interface commands and options.</p>
+            </a>
+        </div>
+        
+        <div class="footer">
+            <p>Built with ❤️ by <a href="https://naptha.ai" class="naptha-link">Naptha</a></p>
+        </div>
     </div>
-    
-    <p><strong>Note:</strong> This documentation is auto-generated from the StackBench repository.</p>
 </body>
 </html>
