@@ -30,7 +30,7 @@
             },
             {
               "type": "command",
-              "command": "python3 $CLAUDE_PROJECT_DIR/.claude/after_response.py"
+              "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/after_response.py"
             }
           ]
         }
