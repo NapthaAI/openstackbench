@@ -96,11 +96,33 @@
             color: var(--text-muted);
             text-decoration: none;
             font-weight: 500;
-            transition: color 0.2s ease;
+            transition: all 0.2s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            position: relative;
         }
 
         .nav a:hover {
             color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .nav a.active {
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.15);
+            font-weight: 600;
+        }
+
+        .nav a.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 2px;
         }
 
         .container {
@@ -206,6 +228,21 @@
             font-style: italic;
         }
 
+        .content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Limit screenshot/large image sizes */
+        .content img[src*="cursor-indexing"],
+        .content img[src*="screenshot"] {
+            max-width: 600px;
+            width: 100%;
+        }
+
         @media (max-width: 768px) {
             .header-content {
                 padding: 0 1rem;
@@ -245,9 +282,9 @@
             <img src="{{ site.logo | relative_url }}" alt="Naptha Logo" class="logo">
             <a href="{{ site.baseurl }}/" class="site-title">StackBench</a>
             <nav class="nav">
-                <a href="{{ site.baseurl }}/tutorials/0.getting-started.html">Getting Started</a>
-                <a href="{{ site.baseurl }}/tutorials/1.how-stackbench-works.html">How It Works</a>
-                <a href="{{ site.baseurl }}/tutorials/2.cli-commands.html">CLI Commands</a>
+                <a href="{{ site.baseurl }}/tutorials/0.getting-started.html" {% if page.url contains '0.getting-started' %}class="active"{% endif %}>Getting Started</a>
+                <a href="{{ site.baseurl }}/tutorials/1.how-stackbench-works.html" {% if page.url contains '1.how-stackbench-works' %}class="active"{% endif %}>How It Works</a>
+                <a href="{{ site.baseurl }}/tutorials/2.cli-commands.html" {% if page.url contains '2.cli-commands' %}class="active"{% endif %}>CLI Commands</a>
             </nav>
         </div>
     </header>
