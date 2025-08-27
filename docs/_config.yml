@@ -1,0 +1,34 @@
+title: StackBench Documentation
+description: Benchmark coding agents on library-specific tasks
+url: https://napthaai.github.io
+baseurl: /openstackbench
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+theme: minima
+
+# Navigation
+header_pages:
+  - tutorials/0.getting-started.md
+  - tutorials/1.how-stackbench-works.md
+  - tutorials/2.cli-commands.md
+
+# Collections
+collections:
+  tutorials:
+    output: true
+    permalink: /:collection/:name/
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "page"
+  - scope:
+      path: ""
+      type: "tutorials"
+    values:
+      layout: "page"
