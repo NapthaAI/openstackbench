@@ -859,12 +859,12 @@ def print_prompt(run_id: str, use_case: int, agent: Optional[str], copy: bool):
             relative_target_dir = target_dir
         
         console.print(f"\n[bold]Next Steps:[/bold]")
+        console.print(f"[yellow]2.[/yellow] Open Cursor IDE in the StackBench directory")
+
         if copy:
             console.print(f"[yellow]1.[/yellow] Paste the prompt from clipboard into Cursor IDE")
         else:
             console.print(f"[yellow]1.[/yellow] Copy the prompt above (or use --copy flag)")
-        console.print(f"[yellow]2.[/yellow] Open Cursor IDE in the repository directory")
-        console.print(f"[yellow]3.[/yellow] Create your solution in: [cyan]{relative_target_dir}/solution.py[/cyan]")
         console.print(f"[yellow]4.[/yellow] Use 'stackbench analyze {run_id}' when all use cases are complete")
         
     except FileNotFoundError:
