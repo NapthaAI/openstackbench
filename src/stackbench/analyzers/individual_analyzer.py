@@ -174,7 +174,7 @@ Save your analysis as a JSON file with this structure:
 {UseCaseAnalysisResult.generate_json_example()}
 ```
 
-**Save the analysis to:** `{target_file_path.parent.resolve()}/use_case_{use_case_number}_analysis.json`
+**Save the analysis to:** `$CLAUDE_OUTPUT_DIR/use_case_{use_case_number}_analysis.json`
 """
         return prompt
     

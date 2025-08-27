@@ -169,14 +169,14 @@ def main():
         # Validate file location first
         if not validate_file_location(file_path):
             print("❌ File location validation failed. Fix the path and try again.", file=sys.stderr)
-            sys.exit(1)
+            sys.exit(2)
         
         if not tool_data.get('tool_response', {}).get('success', False):
             print("⚠️ Write marked as failed, but checking if file exists anyway.", file=sys.stderr)
         
         if not os.path.exists(file_path):
             print(f"❌ File {file_path} does not exist. Validation failed.", file=sys.stderr)
-            sys.exit(1)
+            sys.exit(2)
         
         print(f"📖 Reading and validating StackBench analysis JSON: {filename}", file=sys.stderr)
         

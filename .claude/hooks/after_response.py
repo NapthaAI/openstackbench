@@ -41,7 +41,7 @@ def main():
                     print(f"[Hook] ✅ Moved results.md from cwd to {expected_path}", file=sys.stderr)
                 except Exception as e:
                     print(f"[Hook] ❌ Error moving results.md from cwd: {e}", file=sys.stderr)
-                    sys.exit(1)
+                    sys.exit(2)
         elif expected_path.exists():
             print(f"[Hook] ✅ results.md already in correct location: {expected_path}", file=sys.stderr)
         else:
@@ -49,7 +49,7 @@ def main():
         
     except Exception as e:
         print(f"[Hook] Unexpected error: {e}", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
