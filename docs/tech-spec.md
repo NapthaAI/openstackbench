@@ -77,28 +77,44 @@ Execution Environment:
 └── run_context.json        # Complete run state
 ```
 
-### **Phase 4: Performance Analysis**
+### **Phase 4: Performance Analysis (Two-Stage Approach)**
 
-**Purpose**: Evaluate coding agent performance on library-specific tasks
+**Purpose**: Evaluate coding agent performance on library-specific tasks through comprehensive analysis
 
-Flow:
-- Read execution artifacts (code, outputs, error logs)
-- Use DSPy-powered analysis to evaluate code quality and correctness
+#### **Stage 1: Individual Use Case Analysis**
+
+**Flow:**
+- Read execution artifacts (code, outputs, error logs) for each use case
+- Use Claude Code CLI to analyze individual implementations
 - Test generated code for syntax and runtime correctness
-- Analyze library usage patterns and API compliance
-- Evaluate task completion rates and failure patterns
-- Generate structured performance assessment using AI analysis
+- Analyze library usage patterns (real vs mocked implementations)
+- Evaluate documentation consultation from code comments
+- Generate individual analysis results per use case
 
-Tools used:
-- DSPy with OpenAI integration for intelligent code analysis
-- Python AST parsing for syntax validation
-- Static analysis for library usage patterns
+**Stage 1 Tools:**
+- **Claude Code CLI**: AI-powered code analysis and quality assessment
+- **Python execution**: Runtime correctness validation
+- **Static analysis**: Library usage pattern detection
 
-Analysis Dimensions:
-- Task completion success rate
-- Code quality and library best practices adherence
-- Common failure patterns and error types
-- Documentation utilization effectiveness
+#### **Stage 2: Overall Analysis Report Generation**
+
+**Flow:**
+- Aggregate individual use case results
+- Identify common failure patterns across all use cases
+- Calculate success rates and completion metrics
+- Generate structured performance assessment
+- Create both JSON (programmatic) and Markdown (human-readable) reports
+
+**Stage 2 Tools:**
+- **Claude Code CLI**: Pattern recognition and report generation
+- **Pydantic models**: Structured data validation and formatting
+
+**Analysis Dimensions:**
+- **Code Executability**: Syntax correctness and runtime success
+- **Library Usage**: Real API usage vs mocking patterns
+- **Documentation Consultation**: Evidence of proper research
+- **Quality Assessment**: Overall implementation quality scores
+- **Common Failure Patterns**: Systematic issues across use cases
 
 ## Implementation Details
 
