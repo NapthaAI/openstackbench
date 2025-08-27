@@ -13,13 +13,13 @@
 
 Open source local deployment tool for benchmarking coding agents (especially Cursor) on library-specific tasks. Test how well AI coding assistants understand and work with your documentation, APIs, and domain-specific patterns.
 
-## Why StackBench?
+## Why did we create StackBench?
 
-- 📚 **Library-focused**: Test agents on your specific codebase and documentation
-- 🏠 **Local deployment**: Own your benchmarking data, no cloud dependencies  
-- ⚡ **Cursor integration**: Optimized for IDE-based coding agents
-- 🎯 **Real insights**: Discover obvious failures and improvement opportunities
-- 🌍 **Community-driven**: Expandable benchmark library
+StackBench was created in response to the challenges faced by devtool builders in understanding how AI coding agents interact with their software libraries and APIs. Through conversations with dozens of developer-focused companies, we consistently heard that coding agents often use outdated versions, call deprecated functions, or simply get things wrong. Many maintainers didn’t actually know how well these agents were using their libraries at all.
+
+Existing code generation benchmarks typically evaluate models, not agents, and focus on producing self-contained code snippets rather than assessing real usage of library APIs. Almost none focus on library-specific generation tasks—meaning they don’t test whether an agent can solve a task using the actual methods and patterns from your library, rather than writing everything from scratch.
+
+StackBench fills this gap by providing a tool that benchmarks coding agents on real-world, library-specific tasks. It helps maintainers and developers discover failures, spot improvement opportunities, and get actionable insights into how their documentation and APIs are being used by modern AI coding assistants.
 
 ## Prerequisites
 
@@ -421,11 +421,11 @@ This project aims to validate several hypotheses:
 
 ## Contributing
 
-We welcome contributions! Please see our development guidelines in [CLAUDE.md](CLAUDE.md) for detailed information about:
-- Development setup and workflows
-- Testing guidelines and patterns
-- Architecture decisions and patterns
-- Code style and conventions
+We welcome contributions! 
+
+- **Agent implementations**: Add evaluation for more coding agents
+- **Benchmark tasks**: Add new types of tasks to expand what the benchmark evaluates (e.g. use of APIs via API docs)
+- **Metrics**: Enhance quality assessment by adding or improving evaluation metrics
 
 ## Status
 
