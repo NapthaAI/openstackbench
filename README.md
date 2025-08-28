@@ -21,6 +21,8 @@ Existing code generation benchmarks typically evaluate models, not agents, and f
 
 StackBench fills this gap by providing a tool that benchmarks coding agents on real-world, library-specific tasks. It helps maintainers and developers discover failures, spot improvement opportunities, and get actionable insights into how their documentation and APIs are being used by modern AI coding assistants.
 
+See the [StackBench Documentation](https://docs.stackbench.ai/) and [Getting Started Guide](https://docs.stackbench.ai/tutorials/0.getting-started.html) to get started.
+
 ## Prerequisites
 
 ### System Requirements
