@@ -429,6 +429,6 @@ We welcome contributions!
 
 ## Status
 
-✅ **Production Ready** - Cursor IDE agent fully implemented with complete workflow support. Looking to add more agents - Claude Code CLI agent coming next.
+✅ **Functional** - Cursor IDE agent fully implemented with complete workflow support. Looking to add more agents - Claude Code CLI agent coming next.
 
 ---
