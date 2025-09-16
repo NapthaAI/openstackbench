@@ -3,7 +3,7 @@
 import json
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import List
 
 import dspy
@@ -123,54 +123,71 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
     max_workers = min(context.config.use_case_max_workers, len(documents))
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit initial batch
-        future_to_doc = {}
-        batch_size = max_workers * 2  # Keep pipeline full
+        # Submit initial batch to fill pipeline
+        active_futures = {}
+        doc_index = 0
         
-        for doc in documents[:batch_size]:
+        # Fill initial pipeline
+        while len(active_futures) < max_workers and doc_index < len(documents):
+            doc = documents[doc_index]
             future = executor.submit(process_single_document, doc, language, max_per_doc)
-            future_to_doc[future] = doc
+            active_futures[future] = doc
+            doc_index += 1
         
-        doc_index = batch_size
-        
-        # Process results as they complete
-        for future in as_completed(future_to_doc):
-            document = future_to_doc[future]
-            processed_docs += 1
+        # Process results and keep pipeline full until target reached
+        while active_futures and len(all_use_cases) < context.config.num_use_cases:
+            # Wait for at least one to complete
+            completed_futures = []
+            for future in list(active_futures.keys()):
+                if future.done():
+                    completed_futures.append(future)
             
-            try:
-                use_cases = future.result()
-                if use_cases:
-                    all_use_cases.extend(use_cases)
-                    documents_with_use_cases += 1
-                    relative_path = get_relative_path(document.file_path, context.repo_dir)
-                    print(f"Processed {relative_path}: {len(use_cases)} use cases "
-                          f"(total: {len(all_use_cases)}/{context.config.num_use_cases})")
-                else:
-                    relative_path = get_relative_path(document.file_path, context.repo_dir)
-                    print(f"Processed {relative_path}: no use cases found")
+            # If no futures completed yet, wait a bit and continue
+            if not completed_futures:
+                time.sleep(0.1)
+                continue
+            
+            # Process completed futures
+            for future in completed_futures:
+                document = active_futures.pop(future)
+                processed_docs += 1
                 
-            except Exception as e:
-                relative_path = get_relative_path(document.file_path, context.repo_dir)
-                error_msg = f"Error processing {relative_path}: {e}"
-                errors.append(error_msg)
-                print(error_msg)
+                try:
+                    use_cases = future.result()
+                    if use_cases:
+                        all_use_cases.extend(use_cases)
+                        documents_with_use_cases += 1
+                        relative_path = get_relative_path(document.file_path, context.repo_dir)
+                        print(f"Processed {relative_path}: {len(use_cases)} use cases "
+                              f"(total: {len(all_use_cases)}/{context.config.num_use_cases})")
+                    else:
+                        relative_path = get_relative_path(document.file_path, context.repo_dir)
+                        print(f"Processed {relative_path}: no use cases found")
+                    
+                except Exception as e:
+                    relative_path = get_relative_path(document.file_path, context.repo_dir)
+                    error_msg = f"Error processing {relative_path}: {e}"
+                    errors.append(error_msg)
+                    print(error_msg)
             
-            # Early stopping check
+            # Early stopping check - exit if target reached
             if len(all_use_cases) >= context.config.num_use_cases:
                 print(f"Reached target of {context.config.num_use_cases} use cases, stopping early")
-                # Cancel remaining futures
-                for remaining_future in future_to_doc:
-                    if not remaining_future.done():
-                        remaining_future.cancel()
                 break
             
-            # Submit next document if available
-            if doc_index < len(documents):
-                next_doc = documents[doc_index]
-                new_future = executor.submit(process_single_document, next_doc, language, max_per_doc)
-                future_to_doc[new_future] = next_doc
+            # Fill pipeline with new documents while we have capacity and haven't reached target
+            while (len(active_futures) < max_workers and 
+                   doc_index < len(documents) and 
+                   len(all_use_cases) < context.config.num_use_cases):
+                doc = documents[doc_index]
+                future = executor.submit(process_single_document, doc, language, max_per_doc)
+                active_futures[future] = doc
                 doc_index += 1
+        
+        # Cancel any remaining futures if target reached or no more docs
+        for future in active_futures:
+            if not future.done():
+                future.cancel()
     
     # Trim to exact target count
     final_use_cases = all_use_cases[:context.config.num_use_cases]
