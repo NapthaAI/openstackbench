@@ -339,7 +339,7 @@ Create a comprehensive analysis report as `results.md` following this structure:
 # {repo_name} Analysis Report
 
 **Pass/Fail Status:** {pass_fail}
-**Success Rate:** {successful_cases}/{total_cases} tasks successful ({success_rate:.1f}%)
+**Success Rate:** {success_score:.1f}/{total_cases} tasks successful ({success_rate:.1f}%)
 
 ## Executive Summary
 [Provide 2-3 sentences summarizing the overall performance and key findings]
