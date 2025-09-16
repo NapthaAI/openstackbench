@@ -38,11 +38,18 @@ class OverallAnalyzer:
         if not individual_results:
             raise ValueError("No individual analysis results found to aggregate")
         
-        # Calculate basic metrics
+        # Calculate detailed metrics
         total_cases = len(individual_results)
-        successful_cases = self._count_successful_cases(individual_results)
-        failed_cases = total_cases - successful_cases
-        success_rate = (successful_cases / total_cases * 100) if total_cases > 0 else 0.0
+        successful_cases_score = self._count_successful_cases(individual_results)
+        
+        # Count individual categories for better reporting
+        full_successes = sum(1 for result in individual_results 
+                           if result.get("code_executability", {}).get("is_executable") in [True, "true"])
+        partial_successes = sum(1 for result in individual_results 
+                              if result.get("code_executability", {}).get("is_executable") == "partial")
+        failures = total_cases - full_successes - partial_successes
+        
+        success_rate = (successful_cases_score / total_cases * 100) if total_cases > 0 else 0.0
         
         # Determine pass/fail status (using 50% threshold)
         pass_fail_status = "PASS" if success_rate >= 50.0 else "FAIL"
@@ -63,8 +70,10 @@ class OverallAnalyzer:
                 "pass_fail_status": pass_fail_status,
                 "success_rate": success_rate,
                 "total_use_cases": total_cases,
-                "successful_cases": successful_cases,
-                "failed_cases": failed_cases
+                "full_successes": full_successes,
+                "partial_successes": partial_successes,
+                "failures": failures,
+                "success_score": successful_cases_score
             },
             "use_case_results": individual_results
         }
@@ -230,17 +239,19 @@ class OverallAnalyzer:
         
         return results
     
-    def _count_successful_cases(self, results: List[Dict[str, Any]]) -> int:
-        """Count successful use cases from results."""
-        successful_cases = 0
+    def _count_successful_cases(self, results: List[Dict[str, Any]]) -> float:
+        """Count successful use cases from results, with partial = 0.5 points."""
+        successful_cases = 0.0
         
         for result in results:
             # Check if the use case was executable (including partial)
             code_exec = result.get("code_executability", {})
             is_executable = code_exec.get("is_executable", False)
             # Handle both boolean and string representations
-            if is_executable in [True, "true", "partial"]:
-                successful_cases += 1
+            if is_executable in [True, "true"]:
+                successful_cases += 1.0  # Full success
+            elif is_executable == "partial":
+                successful_cases += 0.5  # Partial success
         
         return successful_cases
     
@@ -253,8 +264,10 @@ class OverallAnalyzer:
         pass_fail = overall_summary["pass_fail_status"]
         success_rate = overall_summary["success_rate"]
         total_cases = overall_summary["total_use_cases"]
-        successful_cases = overall_summary["successful_cases"]
-        failed_cases = overall_summary["failed_cases"]
+        full_successes = overall_summary["full_successes"]
+        partial_successes = overall_summary["partial_successes"]
+        failures = overall_summary["failures"]
+        success_score = overall_summary["success_score"]
         
         # Create a summary of individual results for analysis
         use_case_summaries = []
@@ -283,15 +296,21 @@ You are analyzing the results of a StackBench coding agent benchmark run. Your t
 
 **Repository**: {repo_name}
 **Overall Status**: {pass_fail}  
-**Success Rate**: {success_rate:.1f}% ({successful_cases}/{total_cases} use cases successful)
-**Failed Cases**: {failed_cases}
+**Success Rate**: {success_rate:.1f}% (Score: {success_score:.1f}/{total_cases})
+**Breakdown**: {full_successes} full successes, {partial_successes} partial successes, {failures} failures
 
 ## Individual Use Case Results Summary
 
 """
         
         for uc in use_case_summaries:
-            status = "✅ PASS" if uc["executable"] in [True, "partial"] else "❌ FAIL"
+            if uc["executable"] in [True, "true"]:
+                status = "✅ FULL SUCCESS"
+            elif uc["executable"] == "partial":
+                status = "🔶 PARTIAL SUCCESS"
+            else:
+                status = "❌ FAILURE"
+                
             lib_info = ""
             if uc["library_used"]:
                 lib_info += " | Real library used"
@@ -300,7 +319,7 @@ You are analyzing the results of a StackBench coding agent benchmark run. Your t
             
             prompt += f"- **Use Case {uc['number']}**: {uc['name']} - {status}{lib_info}\n"
             if uc["failure_reason"]:
-                prompt += f"  - Failure: {uc['failure_reason']}\n"
+                prompt += f"  - Issue: {uc['failure_reason']}\n"
         
         prompt += f"""
 
