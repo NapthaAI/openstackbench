@@ -135,7 +135,11 @@ class RepositoryManager:
             
             for file in files:
                 if file.endswith(('.md', '.mdx')):
-                    md_files.append(Path(root) / file)
+                    file_path = Path(root) / file
+                    # Use the same filtering logic as the extractor utils
+                    from ..extractors.utils import should_exclude_document
+                    if not should_exclude_document(file_path):
+                        md_files.append(file_path)
         
         return md_files
     

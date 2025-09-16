@@ -9,6 +9,16 @@ import tiktoken
 from .models import Document
 
 
+def should_exclude_document(file_path: Path) -> bool:
+    """Check if document should be excluded based on filename patterns."""
+    excluded_names = {
+        "changelog", "readme", "license", "contributing", 
+        "code_of_conduct", "security", "authors", "credits",
+    }
+    file_stem = file_path.stem.lower()
+    return file_stem in excluded_names
+
+
 def find_markdown_files(repo_path: Path, include_folders: List[str] = None) -> List[Path]:
     """Find all markdown files in repository, optionally filtered by folders."""
     md_files = []
@@ -22,7 +32,9 @@ def find_markdown_files(repo_path: Path, include_folders: List[str] = None) -> L
         
         for file in files:
             if file.endswith(('.md', '.mdx')):
-                md_files.append(Path(root) / file)
+                file_path = Path(root) / file
+                if not should_exclude_document(file_path):
+                    md_files.append(file_path)
     
     return md_files
 
@@ -60,6 +72,10 @@ def load_documents(markdown_files: List[Path], max_tokens: int = 10000, model: s
     
     for file_path in markdown_files:
         try:
+            # Skip excluded documents as safety net
+            if should_exclude_document(file_path):
+                continue
+                
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
