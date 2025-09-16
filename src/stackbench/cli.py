@@ -1081,12 +1081,16 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
             
             # Show simple summary since we're not generating overall results
             total_cases = len(result)
-            successful_cases = sum(1 for r in result if r.get("code_executability", {}).get("is_executable") in [True, "partial"])
+            full_successes = sum(1 for r in result if r.get("code_executability", {}).get("is_executable") in [True, "true"])
+            partial_successes = sum(1 for r in result if r.get("code_executability", {}).get("is_executable") == "partial")
+            failures = total_cases - full_successes - partial_successes
+            success_score = full_successes + (partial_successes * 0.5)
+            success_rate = (success_score / total_cases * 100) if total_cases > 0 else 0
             
             console.print(f"[bold]Results Summary:[/bold]")
             console.print(f"Total Use Cases: [cyan]{total_cases}[/cyan]")
-            console.print(f"Successful/Partial: [cyan]{successful_cases}[/cyan]")
-            console.print(f"Success Rate: [cyan]{successful_cases/total_cases:.1%}[/cyan]" if total_cases > 0 else "")
+            console.print(f"Success Score: [cyan]{success_score:.1f}/{total_cases}[/cyan] ({success_rate:.1f}%)")
+            console.print(f"Breakdown: [green]{full_successes}[/green] full, [yellow]{partial_successes}[/yellow] partial, [red]{failures}[/red] failed")
             
             # Show individual use case results  
             console.print(f"[bold]Use Case Results:[/bold]")
@@ -1152,12 +1156,16 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
                                 summary = results_data['overall_summary']
                                 pass_fail = summary['pass_fail_status']
                                 success_rate = summary['success_rate']
-                                successful_cases = summary['successful_cases']
+                                success_score = summary['success_score']
+                                full_successes = summary['full_successes']
+                                partial_successes = summary['partial_successes']
+                                failures = summary['failures']
                                 total_cases = summary['total_use_cases']
                                 
                                 status_color = "green" if pass_fail == "PASS" else "red"
                                 console.print(f"• Status: [{status_color}]{pass_fail}[/{status_color}]")
-                                console.print(f"• Success Rate: [cyan]{success_rate:.1f}%[/cyan] ({successful_cases}/{total_cases} use cases)")
+                                console.print(f"• Success Rate: [cyan]{success_rate:.1f}%[/cyan] ({success_score:.1f}/{total_cases} points)")
+                                console.print(f"• Breakdown: [green]{full_successes}[/green] full, [yellow]{partial_successes}[/yellow] partial, [red]{failures}[/red] failed")
                                 
                             except Exception as e:
                                 console.print(f"[yellow]Warning: Could not load results summary: {e}[/yellow]")

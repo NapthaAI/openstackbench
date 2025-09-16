@@ -227,7 +227,7 @@ Based on your Step 4 categorization, set failure_reason appropriately:
 {UseCaseAnalysisResult.generate_json_example()}
 ```
 
-**Save the analysis to:** `$CLAUDE_OUTPUT_DIR/use_case_{use_case_number}_analysis.json`
+**Save the analysis to:** {os.environ['CLAUDE_OUTPUT_DIR']}/use_case_{use_case_number}_analysis.json`
 """
         return prompt
     
@@ -261,6 +261,13 @@ Based on your Step 4 categorization, set failure_reason appropriately:
                 }
             }
         
+        # Set up environment variables for Claude Code hooks - use absolute paths
+        os.environ['CLAUDE_USE_CASE_ID'] = f"use_case_{use_case_number}"
+        os.environ['CLAUDE_OUTPUT_DIR'] = str(use_case_dir.absolute())
+        os.environ['CLAUDE_LOGS_DIR'] = str((context.data_dir / "logs").absolute())
+        os.environ['CLAUDE_PROJECT_DIR'] = str(Path.cwd().absolute())
+        os.environ['CLAUDE_AGENT'] = 'stackbench_analyzer'
+
         # Create analysis prompt
         prompt = self.create_analysis_prompt(
             use_case=use_case,
@@ -268,13 +275,6 @@ Based on your Step 4 categorization, set failure_reason appropriately:
             context=context,
             target_file_path=target_file_path
         )
-        
-        # Set up environment variables for Claude Code hooks - use absolute paths
-        os.environ['CLAUDE_USE_CASE_ID'] = f"use_case_{use_case_number}"
-        os.environ['CLAUDE_OUTPUT_DIR'] = str(use_case_dir.absolute())
-        os.environ['CLAUDE_LOGS_DIR'] = str((context.data_dir / "logs").absolute())
-        os.environ['CLAUDE_PROJECT_DIR'] = str(Path.cwd().absolute())
-        os.environ['CLAUDE_AGENT'] = 'stackbench_analyzer'
         
         # Ensure logs directory exists
         logs_dir = Path(os.environ['CLAUDE_LOGS_DIR'])

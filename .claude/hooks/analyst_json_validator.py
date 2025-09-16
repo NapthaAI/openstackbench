@@ -167,27 +167,44 @@ def main():
             print("⏭️ Not a StackBench analysis file, skipping validation.", file=sys.stderr)
             sys.exit(0)
         
-        # Validate file location first
-        if not validate_file_location(file_path):
-            print("❌ File location validation failed. Fix the path and try again.", file=sys.stderr)
-            sys.exit(2)
+        # Check if this is PreToolUse (content in tool_input) or PostToolUse (file exists)
+        content = tool_data.get('tool_input', {}).get('content', '')
+        is_pretool_use = bool(content)
         
-        if not tool_data.get('tool_response', {}).get('success', False):
-            print("⚠️ Write marked as failed, but checking if file exists anyway.", file=sys.stderr)
+        # Skip file location validation in PreToolUse since path redirector should handle it
+        if not is_pretool_use:
+            # Only validate file location for PostToolUse
+            if not validate_file_location(file_path):
+                print("❌ File location validation failed. Fix the path and try again.", file=sys.stderr)
+                sys.exit(2)
         
-        if not os.path.exists(file_path):
-            print(f"❌ File {file_path} does not exist. Validation failed.", file=sys.stderr)
-            sys.exit(2)
-        
-        print(f"📖 Reading and validating StackBench analysis JSON: {filename}", file=sys.stderr)
-        
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                file_content = json.load(f)
-        except json.JSONDecodeError as e:
-            print(f"❌ INVALID JSON in {filename}: {e}", file=sys.stderr)
-            print("💡 Fix JSON syntax and try again.", file=sys.stderr)
-            sys.exit(2)
+        if is_pretool_use:
+            # PreToolUse: validate content before writing
+            print(f"📝 PreToolUse: Validating JSON content for {filename}", file=sys.stderr)
+            try:
+                file_content = json.loads(content)
+            except json.JSONDecodeError as e:
+                print(f"❌ INVALID JSON CONTENT for {filename}: {e}", file=sys.stderr)
+                print("💡 Fix JSON syntax and try again.", file=sys.stderr)
+                sys.exit(2)
+        else:
+            # PostToolUse: validate existing file
+            if not tool_data.get('tool_response', {}).get('success', False):
+                print("⚠️ Write marked as failed, but checking if file exists anyway.", file=sys.stderr)
+            
+            if not os.path.exists(file_path):
+                print(f"❌ File {file_path} does not exist. Validation failed.", file=sys.stderr)
+                sys.exit(2)
+            
+            print(f"📖 PostToolUse: Reading and validating StackBench analysis JSON: {filename}", file=sys.stderr)
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    file_content = json.load(f)
+            except json.JSONDecodeError as e:
+                print(f"❌ INVALID JSON in {filename}: {e}", file=sys.stderr)
+                print("💡 Fix JSON syntax and try again.", file=sys.stderr)
+                sys.exit(2)
         
         is_valid, errors = validate_stackbench_json_structure(file_content, filename)
         
@@ -223,6 +240,10 @@ def main():
             print(show_required_structure(), file=sys.stderr)
             sys.exit(2)
             
+        # For PreToolUse, output the (potentially modified) tool data
+        if is_pretool_use:
+            json.dump(tool_data, sys.stdout, indent=2)
+        
         print("✅ StackBench JSON validation complete.", file=sys.stderr)
             
     except json.JSONDecodeError as e:
