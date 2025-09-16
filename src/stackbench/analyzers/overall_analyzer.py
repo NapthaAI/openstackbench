@@ -238,7 +238,8 @@ class OverallAnalyzer:
             # Check if the use case was executable (including partial)
             code_exec = result.get("code_executability", {})
             is_executable = code_exec.get("is_executable", False)
-            if is_executable in [True, "partial"]:
+            # Handle both boolean and string representations
+            if is_executable in [True, "true", "partial"]:
                 successful_cases += 1
         
         return successful_cases
