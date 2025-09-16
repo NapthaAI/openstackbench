@@ -11,6 +11,7 @@ class CodeExecutabilityResult(BaseModel):
     is_executable: Union[bool, Literal["partial"]]
     execution_result: str
     failure_reason: Optional[str] = None
+    failure_type: Optional[Literal["setup_issue", "version_issue", "api_compatibility", "infrastructure", "code_logic"]] = None
     test_results: Optional[str] = None
     failed_due_to_api_key_error: bool = False
 
@@ -124,6 +125,7 @@ class UseCaseAnalysisResult(BaseModel):
                 "is_executable": "true/false/\"partial\"",
                 "execution_result": "Success output or error message",
                 "failure_reason": "Specific reason if failed (optional)",
+                "failure_type": "setup_issue|version_issue|api_compatibility|infrastructure|code_logic (optional)",
                 "test_results": "Additional testing results (optional)",
                 "failed_due_to_api_key_error": "true/false"
             },

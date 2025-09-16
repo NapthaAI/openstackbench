@@ -32,6 +32,7 @@ def show_required_structure():
                 "is_executable": "true/false/\"partial\"",
                 "execution_result": "success output or error message",
                 "failure_reason": "specific reason if failed",
+                "failure_type": "setup_issue|version_issue|api_compatibility|infrastructure|code_logic",
                 "test_results": "additional testing results",
                 "failed_due_to_api_key_error": "true/false"
             },

@@ -143,22 +143,57 @@ Analyze the implementation to assess documentation quality and provide structure
 - Review implementation approach and patterns
 - Check error handling and edge cases
 
-### Step 2: Test Code Executability  
+### Step 2: Initial Execution Test
 **IMPORTANT:** Test the implementation by running it exactly as written. Do NOT modify the code.
-- You may set environment variables if needed (e.g., export API_KEY=test)
-- You may install dependencies if needed
-- Capture success output or error messages
-- Assess code quality and functionality
-- Focus ONLY on this single file's execution
+- Try running the main file directly first
+- Set basic environment variables if obviously needed (e.g., export OPENAI_API_KEY=test)
+- Capture the exact error messages or success output
+- Note the specific failure point if execution fails
 
-### Step 3: Analyze Library Usage (Single File Only)
+### Step 3: Systematic Failure Diagnosis (If Step 2 Failed)
+If initial execution failed, investigate systematically to determine the ROOT CAUSE:
+
+**A. Dependency Issues Check:**
+- If import/require errors occur, determine if it's a missing dependency issue
+- For JavaScript: Check if package.json exists and has required dependencies
+  - Try `npm install` if dependencies are listed but not installed
+  - Check if packages actually exist on npm registry before concluding they don't exist
+- For Python: Check for requirements.txt or imports and try installing if needed
+- **CRITICAL:** Distinguish between "package doesn't exist" vs "package not installed locally"
+
+**B. Configuration Issues Check:**
+- Check if failure is due to missing environment variables (try setting test values)
+- For JavaScript projects: Check if ES module configuration is needed
+  - Look for ES6 imports - if present, check if package.json has `"type": "module"`
+  - Try adding `"type": "module"` to package.json if missing
+- Check for other configuration files or setup requirements
+
+**C. Version Compatibility Check:**
+- If specific package versions are specified, verify they exist
+- Try installing with "latest" or "^0.x.x" patterns if exact versions don't exist
+- Check for API compatibility issues if packages install but methods don't exist
+
+**D. Runtime Execution Check:**
+- If code loads successfully but fails during execution, analyze the runtime error
+- Check if it's an API method compatibility issue (e.g., deprecated methods)
+- Check if it's a missing external service (database, API endpoint)
+
+### Step 4: Failure Type Categorization
+Based on your diagnosis, categorize the primary issue:
+- **"setup_issue"**: Missing dependencies, environment variables, or basic configuration that can be easily fixed
+- **"version_issue"**: Wrong or non-existent package versions specified in dependencies
+- **"api_compatibility"**: Code uses outdated, incorrect, or non-existent API methods
+- **"infrastructure"**: Requires external services (databases, APIs) that aren't available
+- **"code_logic"**: Fundamental implementation problems or logical errors
+
+### Step 5: Analyze Library Usage (Single File Only)
 Determine if the implementation uses:
-- Real library imports and methods
+- Real library imports and methods (preferred)
 - Mock/fake implementations
 - If mocked, try to understand why from the code comments and structure
 - Base analysis ONLY on what's visible in the main implementation file
 
-### Step 4: Documentation Analysis (Implementation File Only)
+### Step 6: Documentation Analysis (Implementation File Only)
 Since IDE agents don't have tool usage logs, analyze documentation usage from:
 - "DOCUMENTATION CONSULTED" comments in the implementation
 - Quality of implementation patterns used
@@ -168,7 +203,25 @@ Since IDE agents don't have tool usage logs, analyze documentation usage from:
 ## Required JSON Output
 Save your analysis as a JSON file with this structure:
 
-**IMPORTANT:** Use `"partial"` for is_executable when code runs but has limitations/issues.
+### Executability Status Guidelines:
+- **`"true"`**: Code runs successfully with expected functionality
+- **`"partial"`**: Code loads/starts but has runtime limitations, or would work with basic setup fixes
+  - Use for: dependency issues that can be resolved with npm install
+  - Use for: missing environment variables that can be set
+  - Use for: configuration issues like missing ES module setup
+  - Use for: wrong package versions that can be updated
+  - Use for: code that initializes but fails on external services (databases, APIs)
+- **`"false"`**: Fundamental code logic problems, API compatibility issues, or unresolvable implementation errors
+
+### Failure Reason Guidelines:
+Based on your Step 4 categorization, set failure_reason appropriately:
+- **setup_issue**: "Missing dependencies/configuration - needs npm install and basic setup"
+- **version_issue**: "Package version compatibility - specified versions don't exist or are incompatible"  
+- **api_compatibility**: "API method compatibility - code uses outdated or incorrect API methods"
+- **infrastructure**: "External service dependency - requires database/API that isn't available"
+- **code_logic**: "Implementation logic error - fundamental code problems"
+
+**CRITICAL:** Most cases that appear to "not work" are actually partial successes that need basic setup fixes. Be generous with "partial" classification.
 
 ```json
 {UseCaseAnalysisResult.generate_json_example()}
