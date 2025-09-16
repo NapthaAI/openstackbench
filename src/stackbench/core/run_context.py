@@ -96,6 +96,7 @@ class RunConfig(BaseModel):
     
     # Extraction settings
     num_use_cases: int = Field(default_factory=lambda: get_config().num_use_cases)
+    max_use_case_per_doc: int = Field(default_factory=lambda: get_config().MAX_USE_CASE_PER_DOC)
     use_case_max_workers: int = Field(default_factory=lambda: get_config().use_case_max_workers)
     
     # Agent settings

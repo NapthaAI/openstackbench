@@ -82,7 +82,7 @@ class DocumentProcessor(dspy.Module):
         except Exception as e:
             return False, f"Validation error: {e}"
     
-    def process_document(self, document: Document, language: str = "python") -> List[UseCase]:
+    def process_document(self, document: Document, language: str = "python", max_per_doc: int = 1) -> List[UseCase]:
         """Full pipeline: analyze, extract, and validate use cases from a document."""
         # Step 1: Analyze if document has use cases
         has_use_cases, summary = self.analyze_document(document)
@@ -105,4 +105,5 @@ class DocumentProcessor(dspy.Module):
             else:
                 print(f"Use case '{use_case.name}' validation failed: {feedback}")
         
-        return validated_use_cases
+        # Step 4: Limit to max_per_doc (default 1 use case per document)
+        return validated_use_cases[:max_per_doc]

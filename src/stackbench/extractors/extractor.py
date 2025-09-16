@@ -37,10 +37,10 @@ def setup_dspy():
     dspy.configure(lm=lm)
 
 
-def process_single_document(document: Document, language: str = "python") -> List[UseCase]:
+def process_single_document(document: Document, language: str = "python", max_per_doc: int = 1) -> List[UseCase]:
     """Process a single document and return validated use cases."""
     processor = DocumentProcessor()
-    return processor.process_document(document, language=language)
+    return processor.process_document(document, language=language, max_per_doc=max_per_doc)
 
 
 def get_relative_path(file_path, repo_dir):
@@ -110,8 +110,9 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
     
     print(f"Loaded {len(documents)} documents, processing with target of {context.config.num_use_cases} use cases...")
     
-    # Get language from context config (defaults to "python" if not specified)
+    # Get language and max_use_case_per_doc from context config 
     language = context.config.language or "python"
+    max_per_doc = context.config.max_use_case_per_doc
     
     # Process documents in parallel with early stopping
     all_use_cases = []
@@ -127,7 +128,7 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
         batch_size = max_workers * 2  # Keep pipeline full
         
         for doc in documents[:batch_size]:
-            future = executor.submit(process_single_document, doc, language)
+            future = executor.submit(process_single_document, doc, language, max_per_doc)
             future_to_doc[future] = doc
         
         doc_index = batch_size
@@ -167,7 +168,7 @@ def extract_use_cases(context: RunContext) -> ExtractionResult:
             # Submit next document if available
             if doc_index < len(documents):
                 next_doc = documents[doc_index]
-                new_future = executor.submit(process_single_document, next_doc, language)
+                new_future = executor.submit(process_single_document, next_doc, language, max_per_doc)
                 future_to_doc[new_future] = next_doc
                 doc_index += 1
     

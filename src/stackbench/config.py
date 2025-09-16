@@ -20,6 +20,7 @@ class Config(BaseSettings):
     dspy_max_tokens: int = 10000
     MAX_DOC_TOKENS: int = 10000
     num_use_cases: int = 5
+    MAX_USE_CASE_PER_DOC: int = 1
     use_case_max_workers: int = 4
     include_folders: List[str] = Field(default=[])
     
