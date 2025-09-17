@@ -271,6 +271,9 @@ class OverallAnalyzer:
         
         # Create a summary of individual results for analysis
         use_case_summaries = []
+        documentation_patterns = []
+        success_patterns = []
+        
         for result in results_json["use_case_results"]:
             use_case_name = result.get("use_case_name", "Unknown")
             use_case_num = result.get("use_case_number", "?")
@@ -279,14 +282,54 @@ class OverallAnalyzer:
             lib_used = result.get("underlying_library_usage", {}).get("was_used", False)
             lib_mocked = result.get("underlying_library_usage", {}).get("was_mocked", False)
             
-            use_case_summaries.append({
+            # Extract documentation data
+            doc_tracking = result.get("documentation_tracking", {})
+            files_consulted = doc_tracking.get("files_consulted", [])
+            doc_assessment = result.get("documentation_assessment", "")
+            
+            # Extract implementation quality data
+            code_quality = result.get("code_implementation_quality", {})
+            overall_score = code_quality.get("overall_score", "N/A")
+            completeness_score = code_quality.get("completeness_score", "N/A")
+            
+            use_case_summary = {
                 "number": use_case_num,
                 "name": use_case_name,
                 "executable": is_executable,
                 "failure_reason": failure_reason,
                 "library_used": lib_used,
-                "library_mocked": lib_mocked
-            })
+                "library_mocked": lib_mocked,
+                "files_consulted": files_consulted,
+                "doc_assessment": doc_assessment,
+                "overall_score": overall_score,
+                "completeness_score": completeness_score
+            }
+            use_case_summaries.append(use_case_summary)
+            
+            # Collect documentation patterns
+            if files_consulted:
+                documentation_patterns.append({
+                    "use_case": use_case_num,
+                    "files_count": len(files_consulted),
+                    "success": is_executable in [True, "true", "partial"],
+                    "assessment": doc_assessment
+                })
+            
+            # Collect success patterns
+            if is_executable in [True, "true"]:
+                success_patterns.append({
+                    "use_case": use_case_num,
+                    "name": use_case_name,
+                    "score": overall_score,
+                    "doc_files": len(files_consulted),
+                    "assessment": doc_assessment
+                })
+        
+        # Calculate documentation effectiveness metrics
+        total_with_docs = len([p for p in documentation_patterns if p["files_count"] > 0])
+        docs_consultation_rate = (total_with_docs / total_cases * 100) if total_cases > 0 else 0
+        successful_with_docs = len([p for p in documentation_patterns if p["success"] and p["files_count"] > 0])
+        docs_success_correlation = (successful_with_docs / total_with_docs * 100) if total_with_docs > 0 else 0
         
         prompt = f"""# StackBench Overall Analysis Report Generation
 
@@ -298,6 +341,12 @@ You are analyzing the results of a StackBench coding agent benchmark run. Your t
 **Overall Status**: {pass_fail}  
 **Success Rate**: {success_rate:.1f}% (Score: {success_score:.1f}/{total_cases})
 **Breakdown**: {full_successes} full successes, {partial_successes} partial successes, {failures} failures
+
+## Documentation Effectiveness Metrics
+
+**Documentation Consultation Rate**: {docs_consultation_rate:.1f}% of cases consulted documentation ({total_with_docs}/{total_cases})
+**Documentation Success Correlation**: {docs_success_correlation:.1f}% of cases with documentation were successful
+**Success Patterns**: {len(success_patterns)} cases achieved full success
 
 ## Individual Use Case Results Summary
 
@@ -317,9 +366,15 @@ You are analyzing the results of a StackBench coding agent benchmark run. Your t
             if uc["library_mocked"]:
                 lib_info += " | Library mocked"
             
-            prompt += f"- **Use Case {uc['number']}**: {uc['name']} - {status}{lib_info}\n"
+            # Add implementation quality info
+            quality_info = f" | Implementation Quality: {uc['overall_score']}"
+            docs_info = f" | Docs Consulted: {len(uc['files_consulted'])}"
+            
+            prompt += f"- **Use Case {uc['number']}**: {uc['name']} - {status}{lib_info}{quality_info}{docs_info}\n"
             if uc["failure_reason"]:
                 prompt += f"  - Issue: {uc['failure_reason']}\n"
+            if uc["doc_assessment"]:
+                prompt += f"  - Documentation Assessment: {uc['doc_assessment']}\n"
         
         prompt += f"""
 
@@ -358,8 +413,34 @@ Create a comprehensive analysis report as `results.md` following this structure:
 - Patterns that suggest systematic issues
 - Recommendations for library maintainers
 
+## Documentation Effectiveness Analysis
+**IMPORTANT**: Analyze documentation patterns systematically:
+- **Consultation Rate**: {docs_consultation_rate:.1f}% of cases showed comprehensive documentation usage
+- **Effective Patterns**: Documentation types that led to successful implementations
+- **Gap Patterns**: Recurring documentation issues across multiple use cases
+- **Success Correlation**: {docs_success_correlation:.1f}% of cases with documentation were successful
+
+## Success Pattern Analysis
+**IMPORTANT**: For successful implementations, identify what enabled success:
+- What documentation/API patterns enabled success
+- Identify "success factors" that could be replicated in other areas  
+- Highlight best practices observed in successful implementations
+Success Cases: {[f"Use Case {s['use_case']}: {s['name']}" for s in success_patterns]}
+
 ## Use Case Results Details
-[Create a table or list showing each use case result with key details]
+**IMPORTANT**: Use this enhanced table format that separates execution from implementation quality:
+
+| Use Case | Execution Status | Implementation Quality | Key Issue | Docs Used |
+|----------|------------------|----------------------|-----------|----------|
+[For each use case, show: execution success/failure, implementation quality score, primary issue, documentation consultation]
+**Example Format**: 
+| **4. Parallel Workflow** | ❌ Failure | 8/10 (Excellent) | Missing workflow APIs | 3 files |
+
+## Implementation Quality Recognition
+**CRITICAL**: Emphasize when agents created high-quality code despite execution failures:
+- Distinguish "implementation excellence" from "execution success"
+- Highlight cases where code quality was high (8-10/10) but execution failed due to library issues
+- Recognize agent capabilities separate from API compatibility problems
 
 ## Recommendations
 [Specific actionable recommendations based on the analysis]
@@ -371,6 +452,9 @@ Create a comprehensive analysis report as `results.md` following this structure:
 3. Use specific examples from the results data to support your analysis
 4. Keep the tone professional and constructive
 5. Highlight both successes and failures to provide balanced feedback
+6. **CRITICAL**: Emphasize implementation quality recognition - many failed cases had excellent code quality
+7. **IMPORTANT**: Use the enhanced table format that separates execution status from implementation quality
+8. **REQUIRED**: Include systematic documentation effectiveness analysis and success pattern identification
 
 Generate the analysis report now by creating the `results.md` file at the specified path.
 """
