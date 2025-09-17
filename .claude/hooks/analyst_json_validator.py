@@ -32,9 +32,7 @@ def show_required_structure():
                 "is_executable": "true/false/\"partial\"",
                 "execution_result": "success output or error message",
                 "failure_reason": "specific reason if failed",
-                "failure_type": "setup_issue|version_issue|api_compatibility|infrastructure|code_logic",
-                "test_results": "additional testing results",
-                "failed_due_to_api_key_error": "true/false"
+                "failure_type": "setup_issue|version_issue|api_compatibility|infrastructure|code_logic"
             },
             "underlying_library_usage": {
                 "was_used": "true/false",
@@ -52,7 +50,8 @@ def show_required_structure():
                 "implementation_notes": ["notes from code comments"],
                 "evidence_of_usage": "how documentation was applied"
             },
-            "quality_assessment": {
+            "documentation_assessment": "brief evaluation of doc effectiveness (optional)",
+            "code_implementation_quality": {
                 "completeness_score": "0-10 with reasoning",
                 "clarity_score": "0-10 with reasoning", 
                 "accuracy_score": "0-10 with reasoning",
@@ -99,7 +98,7 @@ def validate_stackbench_json_structure_manual(data, filename):
     required_keys = [
         "use_case_number", "use_case_name", "code_executability",
         "underlying_library_usage", "documentation_tracking",
-        "quality_assessment", "improvement_recommendations"
+        "code_implementation_quality", "improvement_recommendations"
     ]
     
     for key in required_keys:
@@ -116,7 +115,7 @@ def validate_stackbench_json_structure_manual(data, filename):
     
     # Basic required field validation
     if "code_executability" in data:
-        exec_fields = ["is_executable", "execution_result", "failed_due_to_api_key_error"]
+        exec_fields = ["is_executable", "execution_result"]
         for field in exec_fields:
             if field not in data["code_executability"]:
                 errors.append(f"Missing '{field}' in 'code_executability'")
@@ -215,7 +214,7 @@ def main():
                 is_executable = file_content.get("code_executability", {}).get("is_executable")
                 was_mocked = file_content.get("underlying_library_usage", {}).get("was_mocked")
                 files_consulted = file_content.get("documentation_tracking", {}).get("files_consulted", [])
-                overall_score = file_content.get("quality_assessment", {}).get("overall_score", "N/A")
+                overall_score = file_content.get("code_implementation_quality", {}).get("overall_score", "N/A")
                 
                 # Handle partial executable status
                 exec_status = is_executable

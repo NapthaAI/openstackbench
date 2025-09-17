@@ -12,8 +12,6 @@ class CodeExecutabilityResult(BaseModel):
     execution_result: str
     failure_reason: Optional[str] = None
     failure_type: Optional[Literal["setup_issue", "version_issue", "api_compatibility", "infrastructure", "code_logic"]] = None
-    test_results: Optional[str] = None
-    failed_due_to_api_key_error: bool = False
 
 
 class MockingDecisionTrace(BaseModel):
@@ -112,7 +110,8 @@ class UseCaseAnalysisResult(BaseModel):
     code_executability: CodeExecutabilityResult
     underlying_library_usage: UnderlyingLibraryUsage
     documentation_tracking: DocumentationTracking
-    quality_assessment: QualityAssessment
+    documentation_assessment: Optional[str] = None
+    code_implementation_quality: QualityAssessment
     improvement_recommendations: List[ImprovementRecommendation] = Field(default_factory=list)
 
     @classmethod
@@ -125,9 +124,7 @@ class UseCaseAnalysisResult(BaseModel):
                 "is_executable": "true/false/\"partial\"",
                 "execution_result": "Success output or error message",
                 "failure_reason": "Specific reason if failed (optional)",
-                "failure_type": "setup_issue|version_issue|api_compatibility|infrastructure|code_logic (optional)",
-                "test_results": "Additional testing results (optional)",
-                "failed_due_to_api_key_error": "true/false"
+                "failure_type": "setup_issue|version_issue|api_compatibility|infrastructure|code_logic (optional)"
             },
             "underlying_library_usage": {
                 "was_used": "true/false",
@@ -145,7 +142,8 @@ class UseCaseAnalysisResult(BaseModel):
                 "implementation_notes": ["Notes from code comments about decisions made"],
                 "evidence_of_usage": "How documentation was applied in the implementation"
             },
-            "quality_assessment": {
+            "documentation_assessment": "Brief evaluation of doc effectiveness for this use case (optional)",
+            "code_implementation_quality": {
                 "completeness_score": "0-10 with reasoning",
                 "clarity_score": "0-10 with reasoning", 
                 "accuracy_score": "0-10 with reasoning",

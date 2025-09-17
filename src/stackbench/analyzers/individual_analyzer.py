@@ -256,8 +256,7 @@ Based on your Step 4 categorization, set failure_reason appropriately:
                 "code_executability": {
                     "is_executable": False,
                     "execution_result": "File not found",
-                    "failure_reason": "Implementation file missing",
-                    "failed_due_to_api_key_error": False
+                    "failure_reason": "Implementation file missing"
                 }
             }
         
@@ -380,8 +379,7 @@ Based on your Step 4 categorization, set failure_reason appropriately:
                 "code_executability": {
                     "is_executable": False,
                     "execution_result": f"Analysis error: {str(e)}",
-                    "failure_reason": "Analysis process failed",
-                    "failed_due_to_api_key_error": "ANTHROPIC_API_KEY" in str(e)
+                    "failure_reason": "Analysis process failed"
                 }
             }
     
@@ -471,8 +469,7 @@ Based on your Step 4 categorization, set failure_reason appropriately:
                         "code_executability": {
                             "is_executable": False,
                             "execution_result": f"Analysis error: {str(result)}",
-                            "failure_reason": "Analysis process failed",
-                            "failed_due_to_api_key_error": "ANTHROPIC_API_KEY" in str(result)
+                            "failure_reason": "Analysis process failed"
                         }
                     }
                     new_results[i] = error_result
