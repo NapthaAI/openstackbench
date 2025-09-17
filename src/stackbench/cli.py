@@ -1042,7 +1042,7 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
                 was_mocked = lib_usage.get("was_mocked", False)
                 console.print(f"Library used: [cyan]{was_used}[/cyan], Mocked: [cyan]{was_mocked}[/cyan]")
                 
-                quality = result.get("quality_assessment", {})
+                quality = result.get("code_implementation_quality", {})
                 overall_score = quality.get("overall_score", "N/A")
                 console.print(f"Overall score: [cyan]{overall_score}[/cyan]")
             
