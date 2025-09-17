@@ -1099,9 +1099,9 @@ def analyze(run_id: str, use_case: Optional[int], force: bool, workers: Optional
                 use_case_name = use_case_result.get("use_case_name", "Unknown")
                 is_executable = use_case_result.get("code_executability", {}).get("is_executable", False)
                 
-                status_color = "green" if is_executable in [True, "partial"] else "red"
-                status_text = "✓" if is_executable is True else "◐" if is_executable == "partial" else "✗"
-                exec_text = "PASS" if is_executable is True else "PARTIAL" if is_executable == "partial" else "FAIL"
+                status_color = "green" if is_executable in [True, "true", "partial"] else "red"
+                status_text = "✓" if is_executable in [True, "true"] else "◐" if is_executable == "partial" else "✗"
+                exec_text = "PASS" if is_executable in [True, "true"] else "PARTIAL" if is_executable == "partial" else "FAIL"
                 
                 console.print(f"• [{status_color}]{status_text}[/{status_color}] Use Case {use_case_num}: {use_case_name} - [{status_color}]{exec_text}[/{status_color}]")
             
